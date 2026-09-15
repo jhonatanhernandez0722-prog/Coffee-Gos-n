@@ -6,7 +6,7 @@ import { AdminPage } from "@/components/admin-page";
 
 type Customer = { id: number; name: string; phone: string | null; purchase_count: number; total_spent: number; pending_credit: number; last_purchase_at: string | null };
 type CustomerDashboard = { total_customers: number; total_purchases: number; total_spent: number; pending_credits: number; purchases_today: number; customers: Customer[] };
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001/api/v1";
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "https://backend-lemon-five-80.vercel.app/api/v1" : "http://localhost:8001/api/v1");
 const money = (value: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(value);
 
 export default function ClientsPage() {

@@ -6,7 +6,7 @@ import { AdminPage } from "@/components/admin-page";
 
 type Movement = { id: number; domain: "inventory" | "financial"; related_id: number | null; movement_type: string; amount: number | null; quantity: number | null; concept: string; product_name: string | null; created_at: string };
 type MovementGroup = { key: string; created_at: string; inventory: string[]; financial: string[] };
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001/api/v1";
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "https://backend-lemon-five-80.vercel.app/api/v1" : "http://localhost:8001/api/v1");
 const money = (value: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(value);
 const quantityLabel = (value: number | null) => value === null ? "-" : Number.isInteger(Number(value)) ? String(Number(value)) : String(value);
 const labels: Record<string, string> = { SALE: "Salida por venta", PURCHASE: "Entrada de inventario", ADJUSTMENT: "Ajuste de inventario", INTERNAL_USE: "Uso interno", INCOME: "Ingreso", EXPENSE: "Egreso" };

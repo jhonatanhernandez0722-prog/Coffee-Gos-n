@@ -6,7 +6,7 @@ import { AdminPage } from "@/components/admin-page";
 
 type Seller = { id: number; full_name: string; email: string; is_active: boolean; permissions: string[] };
 type PermissionKey = "dashboard" | "comanda" | "productos" | "clientes" | "creditos" | "movimientos";
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001/api/v1";
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "https://backend-lemon-five-80.vercel.app/api/v1" : "http://localhost:8001/api/v1");
 const sections: { key: PermissionKey; label: string }[] = [
   { key: "dashboard", label: "Resumen" }, { key: "comanda", label: "Comanda" }, { key: "productos", label: "Productos" },
   { key: "clientes", label: "Clientes" }, { key: "creditos", label: "Créditos" }, { key: "movimientos", label: "Movimientos" },

@@ -11,7 +11,7 @@ type PaymentMethod = "CASH" | "NEQUI" | "CREDIT";
 type Customer = { id: number; name: string };
 type Receipt = { sale_number: string; total: number; payment_method: PaymentMethod; customer_name: string | null; created_at: string; items: { name: string; quantity: number; unit_price: number; line_total: number }[] };
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001/api/v1";
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "https://backend-lemon-five-80.vercel.app/api/v1" : "http://localhost:8001/api/v1");
 const imageUrl = (path: string) => `${apiUrl.replace("/api/v1", "")}${path}`;
 const money = (value: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(value);
 const paymentLabel: Record<PaymentMethod, string> = { CASH: "Efectivo", NEQUI: "Nequi", CREDIT: "Crédito" };

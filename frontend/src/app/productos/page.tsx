@@ -10,7 +10,7 @@ type Category = { id: number; name: string; is_active: boolean };
 type Section = "sale" | "aseo";
 type AseoMetrics = { product_count: number; total_units: number; stock_value: number };
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001/api/v1";
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "https://backend-lemon-five-80.vercel.app/api/v1" : "http://localhost:8001/api/v1");
 const money = (value: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(value);
 const apiError = (result: { detail?: string | { msg?: string }[] }, fallback: string) => Array.isArray(result.detail) ? result.detail.map((item) => item.msg).filter(Boolean).join(". ") || fallback : result.detail || fallback;
 

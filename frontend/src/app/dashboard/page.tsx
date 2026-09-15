@@ -18,7 +18,7 @@ type DashboardSummary = {
 type AlertItem = { id: string; kind: "LOW_STOCK" | "SALE"; title: string; detail: string; created_at: string | null; href: string | null };
 type CurrentUser = { full_name?: string; role?: string; permissions?: string[] };
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001/api/v1";
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "https://backend-lemon-five-80.vercel.app/api/v1" : "http://localhost:8001/api/v1");
 const navigation = [
   { label: "Resumen", href: "/dashboard", icon: LayoutDashboard, permission: "dashboard" },
   { label: "Comanda", href: "/comanda", icon: ShoppingBag, permission: "comanda" },
