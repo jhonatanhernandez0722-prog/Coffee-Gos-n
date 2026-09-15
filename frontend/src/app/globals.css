@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+:root {
+	--blue-main: #0891b2;
+	--blue-secondary: #0f766e;
+	--blue-light: #cffafe;
+	--ink: #083344;
+	--muted: #4b6470;
+	--line: #b7d7dc;
+	--surface: #ffffff;
+	--canvas: #ecfeff;
+}
+
+* { box-sizing: border-box; }
+html { background: var(--canvas); }
+body { margin: 0; color: var(--ink); background: var(--canvas); font-family: "Avenir Next", "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button, input { font: inherit; }
+button, a, input, select { outline-color: var(--blue-main); outline-offset: 3px; }
+::selection { color: var(--surface); background: var(--blue-main); }
+.shell-grid { background-image: linear-gradient(to right, rgba(20, 184, 166, 0.16) 1px, transparent 1px), linear-gradient(to bottom, rgba(20, 184, 166, 0.16) 1px, transparent 1px); background-size: 38px 38px; }
+@media (prefers-reduced-motion: no-preference) { .reveal { animation: reveal 550ms ease both; } .reveal-delay { animation-delay: 120ms; } }
+@keyframes reveal { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }

@@ -1,0 +1,76 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Image from "next/image";
+import { Minus, Plus, Printer, Search, ShoppingBag, Trash2, X } from "lucide-react";
+import { AdminPage } from "@/components/admin-page";
+
+type Product = { id: number; name: string; sale_price: number; stock: number; image_url?: string | null };
+type CartLine = Product & { quantity: number };
+type PaymentMethod = "CASH" | "NEQUI" | "CREDIT";
+type Customer = { id: number; name: string };
+type Receipt = { sale_number: string; total: number; payment_method: PaymentMethod; customer_name: string | null; created_at: string; items: { name: string; quantity: number; unit_price: number; line_total: number }[] };
+
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001/api/v1";
+const imageUrl = (path: string) => `${apiUrl.replace("/api/v1", "")}${path}`;
+const money = (value: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(value);
+const paymentLabel: Record<PaymentMethod, string> = { CASH: "Efectivo", NEQUI: "Nequi", CREDIT: "Crédito" };
+
+export default function ComandaPage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [cart, setCart] = useState<CartLine[]>([]);
+  const [search, setSearch] = useState("");
+  const [buyerName, setBuyerName] = useState("");
+  const [customerId, setCustomerId] = useState<number | null>(null);
+  const [suggestions, setSuggestions] = useState<Customer[]>([]);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [receipt, setReceipt] = useState<Receipt | null>(null);
+
+  useEffect(() => {
+    const token = sessionStorage.getItem("coffee_gosen_access_token");
+    fetch(`${apiUrl}/products?saleable_only=true`, { headers: token ? { Authorization: `Bearer ${token}` } : undefined })
+      .then(async (response) => { const result = await response.json(); if (!response.ok) throw new Error(result.detail ?? "No fue posible cargar el catálogo."); return result as Product[]; })
+      .then(setProducts)
+      .catch((requestError: Error) => setError(requestError.message));
+  }, []);
+
+  useEffect(() => {
+    if (buyerName.trim().length < 1 || customerId) { Promise.resolve().then(() => setSuggestions([])); return; }
+    const token = sessionStorage.getItem("coffee_gosen_access_token");
+    const timer = window.setTimeout(() => fetch(`${apiUrl}/customers/search?query=${encodeURIComponent(buyerName.trim())}`, { headers: token ? { Authorization: `Bearer ${token}` } : undefined }).then((response) => response.json()).then(setSuggestions).catch(() => setSuggestions([])), 220);
+    return () => window.clearTimeout(timer);
+  }, [buyerName, customerId]);
+
+  function addProduct(product: Product) { setCart((current) => { const line = current.find((item) => item.id === product.id); if (line) return current.map((item) => item.id === product.id ? { ...item, quantity: Math.min(item.quantity + 1, Number(item.stock)) } : item); return [...current, { ...product, quantity: 1 }]; }); }
+  function changeQuantity(id: number, amount: number) { setCart((current) => current.map((item) => item.id === id ? { ...item, quantity: Math.max(0, Math.min(item.quantity + amount, Number(item.stock))) } : item).filter((item) => item.quantity > 0)); }
+  function chooseCustomer(customer: Customer) { setCustomerId(customer.id); setBuyerName(customer.name); setSuggestions([]); }
+
+  async function confirmSale() {
+    setError("");
+    if (paymentMethod === "CREDIT" && !buyerName.trim()) { setError("Para una venta a crédito debes indicar el nombre del comprador."); return; }
+    setSaving(true);
+    try {
+      const token = sessionStorage.getItem("coffee_gosen_access_token");
+      const response = await fetch(`${apiUrl}/sales`, { method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ customer_id: customerId, buyer_name: buyerName.trim() || null, payment_method: paymentMethod, items: cart.map((item) => ({ product_id: item.id, quantity: item.quantity })) }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.detail ?? "No fue posible confirmar la venta.");
+      setReceipt(result as Receipt); setCart([]); setBuyerName(""); setCustomerId(null); setPaymentMethod("CASH");
+      const productsResponse = await fetch(`${apiUrl}/products?saleable_only=true`, { headers: token ? { Authorization: `Bearer ${token}` } : undefined });
+      if (productsResponse.ok) setProducts(await productsResponse.json() as Product[]);
+    } catch (requestError) { setError(requestError instanceof Error ? requestError.message : "No fue posible confirmar la venta."); } finally { setSaving(false); }
+  }
+
+  const visibleProducts = products.filter((product) => product.name.toLowerCase().includes(search.toLowerCase()) && Number(product.stock) > 0);
+  const total = cart.reduce((sum, item) => sum + item.sale_price * item.quantity, 0);
+
+  return <AdminPage title="Comanda" description="Selecciona productos, el comprador y el método de pago.">
+    {error && <p role="alert" className="mb-6 border border-red-200 bg-red-50 p-5 text-sm text-red-700">{error}</p>}
+    <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+      <section className="border border-[var(--line)] bg-white p-5"><label className="relative block"><span className="sr-only">Buscar productos</span><Search size={18} className="absolute left-3 top-3.5 text-[var(--muted)]" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar producto para agregar" className="min-h-12 w-full border border-[var(--line)] pl-10 pr-4 outline-none focus:border-[var(--blue-main)]" /></label><div className="mt-5 grid gap-4 sm:grid-cols-2">{visibleProducts.map((product) => <button key={product.id} onClick={() => addProduct(product)} className="flex min-h-72 flex-col overflow-hidden border-[3px] border-black bg-white text-left hover:bg-white focus:bg-white"><span className="relative block aspect-[4/3] w-full bg-white">{product.image_url ? <Image src={imageUrl(product.image_url)} alt={product.name} fill unoptimized className="object-contain" /> : <ShoppingBag className="absolute inset-0 m-auto text-[var(--blue-main)]" size={42} />}</span><span className="flex flex-1 items-end justify-between gap-3 bg-white p-4"><span><strong className="block">{product.name}</strong><span className="mt-1 block text-sm text-[var(--muted)]">Stock: {product.stock}</span></span><span className="shrink-0 font-semibold text-[var(--blue-main)]">{money(product.sale_price)}</span></span></button>)}</div>{products.length === 0 && <div className="p-10 text-center text-sm text-[var(--muted)]"><ShoppingBag className="mx-auto mb-3 text-[var(--blue-main)]" size={26} />El catálogo está vacío.</div>}</section>
+      <aside className="border border-[var(--ink)] bg-white p-5"><div className="border-b border-[var(--line)] pb-4"><h2 className="font-semibold">Datos de la venta</h2><div className="relative mt-4"><label className="text-sm font-semibold">Comprador<input value={buyerName} onChange={(event) => { setBuyerName(event.target.value); setCustomerId(null); }} placeholder="Escribe para buscar o crear" className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal outline-none focus:border-[var(--blue-main)]" /></label>{suggestions.length > 0 && <div className="absolute z-10 mt-1 w-full border border-[var(--line)] bg-white shadow-lg">{suggestions.map((customer) => <button key={customer.id} type="button" onClick={() => chooseCustomer(customer)} className="block min-h-11 w-full px-3 text-left text-sm hover:bg-[var(--blue-light)]">{customer.name}</button>)}</div>}</div><label className="mt-3 block text-sm font-semibold">Método de pago<select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)} className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal outline-none focus:border-[var(--blue-main)]"><option value="CASH">Efectivo</option><option value="NEQUI">Nequi</option><option value="CREDIT">Crédito</option></select></label>{paymentMethod === "CREDIT" && <p className="mt-2 text-xs text-[var(--muted)]">El crédito se crea automáticamente con esta venta.</p>}</div><div className="flex items-center justify-between border-b border-[var(--line)] py-4"><h2 className="font-semibold">Venta actual</h2><span className="text-sm text-[var(--muted)]">{cart.length} líneas</span></div><div className="min-h-48 py-4">{cart.length === 0 ? <p className="py-12 text-center text-sm text-[var(--muted)]">Selecciona productos para comenzar.</p> : cart.map((item) => <div key={item.id} className="border-b border-[var(--line)] py-3"><div className="flex items-start justify-between gap-3"><p className="font-semibold">{item.name}</p><button aria-label={`Eliminar ${item.name}`} onClick={() => setCart((current) => current.filter((line) => line.id !== item.id))} className="text-[var(--muted)] hover:text-red-600"><Trash2 size={16} /></button></div><div className="mt-2 flex items-center justify-between"><div className="flex items-center gap-2"><button aria-label="Reducir cantidad" onClick={() => changeQuantity(item.id, -1)} className="grid size-8 place-items-center border border-[var(--line)]"><Minus size={14} /></button><span className="w-5 text-center text-sm">{item.quantity}</span><button aria-label="Aumentar cantidad" onClick={() => changeQuantity(item.id, 1)} className="grid size-8 place-items-center border border-[var(--line)]"><Plus size={14} /></button></div><span className="font-semibold">{money(item.sale_price * item.quantity)}</span></div></div>)}</div><div className="border-t border-[var(--line)] pt-4"><div className="flex items-center justify-between text-lg font-semibold"><span>Total</span><span>{money(total)}</span></div><button onClick={confirmSale} disabled={cart.length === 0 || saving} className="mt-5 min-h-12 w-full bg-[var(--blue-main)] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">{saving ? "Registrando..." : "Confirmar venta"}</button></div></aside>
+    </div>
+    {receipt && <div className="fixed inset-0 z-20 grid place-items-center bg-[var(--ink)]/50 p-4"><article className="w-full max-w-md bg-white p-7 shadow-2xl"><div className="flex justify-end print:hidden"><button aria-label="Cerrar factura" onClick={() => setReceipt(null)}><X size={20} /></button></div><div className="text-center"><div className="mx-auto grid size-12 place-items-center bg-[var(--blue-main)] text-white"><ShoppingBag size={22} /></div><h2 className="mt-4 text-2xl font-semibold">Coffee Gosen</h2><p className="mt-1 text-xs text-[var(--muted)]">Comprobante de venta</p></div><div className="mt-6 border-y border-dashed border-[var(--line)] py-4 text-sm"><div className="flex justify-between"><span>Venta</span><strong>{receipt.sale_number}</strong></div><div className="mt-2 flex justify-between"><span>Comprador</span><span>{receipt.customer_name ?? "Venta general"}</span></div><div className="mt-2 flex justify-between"><span>Pago</span><span>{paymentLabel[receipt.payment_method]}</span></div></div><div className="py-4">{receipt.items.map((item) => <div key={item.name} className="flex justify-between py-2 text-sm"><span>{item.quantity} x {item.name}</span><strong>{money(item.line_total)}</strong></div>)}</div><div className="flex justify-between border-t-2 border-[var(--ink)] pt-4 text-xl font-semibold"><span>Total</span><span>{money(receipt.total)}</span></div><button onClick={() => window.print()} className="print:hidden mt-6 inline-flex min-h-11 w-full items-center justify-center gap-2 bg-[var(--blue-main)] font-semibold text-white"><Printer size={17} /> Imprimir factura</button></article></div>}
+  </AdminPage>;
+}

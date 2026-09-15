@@ -1,0 +1,52 @@
+from decimal import Decimal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class CategoryCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=100)
+    description: str | None = Field(default=None, max_length=500)
+
+
+class CategoryResponse(CategoryCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    is_active: bool
+
+
+class ProductCreate(BaseModel):
+    category_id: int = Field(gt=0)
+    name: str = Field(min_length=2, max_length=150)
+    description: str | None = Field(default=None, max_length=1000)
+    image_url: str | None = Field(default=None, max_length=500)
+    is_saleable: bool = True
+    sale_price: Decimal = Field(ge=0, decimal_places=2)
+    acquisition_cost: Decimal = Field(ge=0, decimal_places=2)
+    stock: int = Field(ge=0)
+    low_stock_threshold: int = Field(default=5, ge=0)
+    restock_quantity: int = Field(default=10, gt=0)
+
+
+class ProductUpdate(BaseModel):
+    category_id: int | None = Field(default=None, gt=0)
+    name: str | None = Field(default=None, min_length=2, max_length=150)
+    description: str | None = Field(default=None, max_length=1000)
+    image_url: str | None = Field(default=None, max_length=500)
+    is_saleable: bool | None = None
+    sale_price: Decimal | None = Field(default=None, ge=0, decimal_places=2)
+    acquisition_cost: Decimal | None = Field(default=None, ge=0, decimal_places=2)
+    stock: int | None = Field(default=None, ge=0)
+    low_stock_threshold: int | None = Field(default=None, ge=0)
+    restock_quantity: int | None = Field(default=None, gt=0)
+
+
+class ProductResponse(ProductCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    is_active: bool
+
+
+class AseoAccessRequest(BaseModel):
+    pin: str = Field(min_length=4, max_length=20)

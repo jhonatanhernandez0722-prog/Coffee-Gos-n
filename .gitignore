@@ -1,0 +1,29 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Node and Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.vercel/
+frontend/.env.local
+frontend/*.tsbuildinfo
+frontend/.git-frontend-history/
+
+# Logs and local tooling
+*.log
+.vscode/
+
+# Database/runtime artifacts
+*.sqlite3
+
+# Keep source media, ignore generated caches
+backend/storage/**/.DS_Store
