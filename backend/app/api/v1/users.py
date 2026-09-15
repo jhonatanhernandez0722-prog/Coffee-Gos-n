@@ -3,7 +3,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.v1.dependencies import require_admin
+from app.api.v1.dependencies import get_current_user, require_admin
 from app.core.permissions import SECTIONS, user_sections
 from app.core.security import hash_password
 from app.db.session import get_db
@@ -33,6 +33,12 @@ def validate_permissions(permissions: list[str]) -> None:
 @router.get("", response_model=list[SellerResponse])
 def list_sellers(database: Session = Depends(get_db), _: User = Depends(require_admin)) -> list[SellerResponse]:
     sellers = database.scalars(select(User).where(User.role == "SELLER").order_by(User.full_name)).all()
+    return [seller_response(seller) for seller in sellers]
+
+
+@router.get("/available", response_model=list[SellerResponse])
+def available_sellers(database: Session = Depends(get_db), _: User = Depends(get_current_user)) -> list[SellerResponse]:
+    sellers = database.scalars(select(User).where(User.role == "SELLER", User.is_active.is_(True)).order_by(User.full_name)).all()
     return [seller_response(seller) for seller in sellers]
 
 

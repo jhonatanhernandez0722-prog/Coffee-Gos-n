@@ -54,7 +54,10 @@ def customers_summary(
     today = datetime.now(timezone.utc).date()
     start_of_day = datetime.combine(today, time.min, tzinfo=timezone.utc)
     purchase_count = select(func.count(Sale.id)).where(Sale.customer_id == Customer.id).correlate(Customer).scalar_subquery()
-    total_spent = select(func.coalesce(func.sum(Sale.total), 0)).where(Sale.customer_id == Customer.id).correlate(Customer).scalar_subquery()
+    total_spent = select(func.coalesce(func.sum(Sale.total), 0)).where(
+        Sale.customer_id == Customer.id,
+        ~select(Credit.id).where(Credit.sale_id == Sale.id, Credit.status == "PENDING").exists(),
+    ).correlate(Customer).scalar_subquery()
     pending_credit = select(func.coalesce(func.sum(Credit.pending_amount), 0)).where(Credit.customer_id == Customer.id, Credit.status == "PENDING").correlate(Customer).scalar_subquery()
     last_purchase = select(func.max(Sale.created_at)).where(Sale.customer_id == Customer.id).correlate(Customer).scalar_subquery()
     rows = database.execute(

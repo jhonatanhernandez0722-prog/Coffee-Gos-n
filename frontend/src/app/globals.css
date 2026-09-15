@@ -19,5 +19,14 @@ button, input { font: inherit; }
 button, a, input, select { outline-color: var(--blue-main); outline-offset: 3px; }
 ::selection { color: var(--surface); background: var(--blue-main); }
 .shell-grid { background-image: linear-gradient(to right, rgba(20, 184, 166, 0.16) 1px, transparent 1px), linear-gradient(to bottom, rgba(20, 184, 166, 0.16) 1px, transparent 1px); background-size: 38px 38px; }
+.grid.gap-px.overflow-hidden.border { gap: 1rem; overflow: visible; border: 0; background: transparent; }
+.grid.gap-px.overflow-hidden.border > * { border: 1px solid var(--line); }
+.grid.gap-px.overflow-hidden.border > :first-child { border-color: var(--blue-secondary); background: var(--blue-light); }
+@media (min-width: 640px) {
+	.grid.gap-px.overflow-hidden.border > :first-child { grid-column: span 2; }
+}
+@media (min-width: 1280px) {
+	.grid.gap-px.overflow-hidden.border > :first-child { grid-column: span 3; }
+}
 @media (prefers-reduced-motion: no-preference) { .reveal { animation: reveal 550ms ease both; } .reveal-delay { animation-delay: 120ms; } }
 @keyframes reveal { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }

@@ -10,6 +10,8 @@ SECTIONS = {
     "clientes": "Clientes",
     "creditos": "Créditos",
     "movimientos": "Movimientos",
+    "egresos": "Egresos",
+    "metricas": "Métricas",
 }
 
 

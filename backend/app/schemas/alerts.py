@@ -15,3 +15,7 @@ class AlertItem(BaseModel):
 class AlertsResponse(BaseModel):
     alerts: list[AlertItem]
     unread_count: int
+
+
+class AlertReadRequest(BaseModel):
+    alert_ids: list[str]

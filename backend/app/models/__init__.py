@@ -1,25 +1,31 @@
 from app.models.domain import (
+    AlertRead,
     Category,
     Credit,
     Customer,
+    ExpenseCategory,
     FinancialMovement,
     InventoryMovement,
     Product,
     Sale,
     SaleItem,
+    SaleSupport,
     User,
     UserPermission,
 )
 
 __all__ = [
+    "AlertRead",
     "Category",
     "Credit",
     "Customer",
+    "ExpenseCategory",
     "FinancialMovement",
     "InventoryMovement",
     "Product",
     "Sale",
     "SaleItem",
+    "SaleSupport",
     "User",
     "UserPermission",
 ]

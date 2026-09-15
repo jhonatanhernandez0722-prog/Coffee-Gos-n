@@ -4,28 +4,85 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.v1.dependencies import get_current_user, require_admin
+from app.api.v1.dependencies import get_current_user
 from app.core.permissions import require_section
 from app.db.session import get_db
-from app.models import InventoryMovement, Product, User
-from app.schemas.inventory import InternalUseCreate, InventorySummary
+from app.models import ExpenseCategory, FinancialMovement, InventoryMovement, Product, User
+from app.schemas.inventory import InternalUseCreate, InventorySummary, PurchaseCreate
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
+
+
+@router.post("/purchase")
+def register_purchase(
+    payload: PurchaseCreate,
+    database: Session = Depends(get_db),
+    current_user: User = Depends(require_section("productos")),
+) -> dict:
+    product = database.scalar(select(Product).where(Product.id == payload.product_id).with_for_update())
+    if product is None or not product.is_active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Solo se pueden comprar productos activos")
+    if payload.unit_cost <= 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El costo unitario debe ser mayor a cero")
+
+    product.stock += payload.quantity
+    product.acquisition_cost = payload.unit_cost
+
+    expense_category = database.scalar(select(ExpenseCategory).where(ExpenseCategory.name.ilike("Aseo")).limit(1))
+    if expense_category is None:
+        expense_category = ExpenseCategory(name="Aseo")
+        database.add(expense_category)
+        database.flush()
+
+    movement = InventoryMovement(
+        product_id=product.id,
+        user_id=current_user.id,
+        movement_type="PURCHASE",
+        quantity=payload.quantity,
+        stock_after=product.stock,
+        observation=payload.observation or "Compra de inventario",
+    )
+    database.add(movement)
+
+    expense_amount = payload.quantity * payload.unit_cost
+    financial_movement = FinancialMovement(
+        user_id=current_user.id,
+        movement_type="EXPENSE",
+        amount=expense_amount,
+        concept=f"Compra de {product.name}",
+        payment_method=payload.payment_method,
+        expense_category_id=expense_category.id,
+        observation=payload.observation or f"Compra de {product.name}",
+    )
+    database.add(financial_movement)
+
+    database.commit()
+    database.refresh(product)
+    return {
+        "movement_id": movement.id,
+        "product_id": product.id,
+        "stock_after": int(product.stock),
+        "movement_type": "PURCHASE",
+        "expense_amount": float(expense_amount),
+    }
 
 
 @router.post("/internal-use")
 def register_internal_use(
     payload: InternalUseCreate,
     database: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_section("productos")),
 ) -> dict:
     product = database.scalar(select(Product).where(Product.id == payload.product_id).with_for_update())
     if product is None or not product.is_active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only active products can be taken internally")
     if product.stock < payload.quantity:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Insufficient stock for {product.name}")
+    seller = database.scalar(select(User).where(User.id == payload.assigned_seller_id, User.role == "SELLER", User.is_active.is_(True)))
+    if seller is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La vendedora seleccionada no está disponible")
     product.stock -= payload.quantity
-    movement = InventoryMovement(product_id=product.id, user_id=current_user.id, movement_type="INTERNAL_USE", quantity=payload.quantity, stock_after=product.stock, observation=payload.observation)
+    movement = InventoryMovement(product_id=product.id, user_id=current_user.id, assigned_seller_id=seller.id, movement_type="INTERNAL_USE", quantity=payload.quantity, stock_after=product.stock, observation=payload.observation)
     database.add(movement)
     database.commit()
     return {"movement_id": movement.id, "product_id": product.id, "stock_after": int(product.stock), "movement_type": "INTERNAL_USE"}

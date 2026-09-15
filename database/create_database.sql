@@ -59,10 +59,19 @@ CREATE TABLE IF NOT EXISTS sales (
     sale_number     VARCHAR(30) NOT NULL UNIQUE,
     customer_id     BIGINT REFERENCES customers(id),
     user_id         BIGINT NOT NULL REFERENCES users(id),
+    assigned_seller_id BIGINT REFERENCES users(id),
     payment_method  VARCHAR(20) NOT NULL
                     CHECK (payment_method IN ('CASH', 'NEQUI', 'CREDIT')),
     subtotal        NUMERIC(12, 2) NOT NULL CHECK (subtotal >= 0),
     total           NUMERIC(12, 2) NOT NULL CHECK (total >= 0),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS sale_supports (
+    id              BIGSERIAL PRIMARY KEY,
+    sale_id         BIGINT NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
+    file_url        VARCHAR(500) NOT NULL,
+    file_name       VARCHAR(255) NOT NULL,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -2,12 +2,12 @@ from datetime import date, datetime, time, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.api.v1.dependencies import get_current_user
 from app.core.permissions import require_section
 from app.db.session import get_db
-from app.models import FinancialMovement, InventoryMovement, Product, SaleItem, User
+from app.models import Customer, FinancialMovement, InventoryMovement, Product, Sale, SaleItem, SaleSupport, User
 from app.schemas.movements import MovementRow, MovementsResponse
 
 router = APIRouter(prefix="/movements", tags=["movements"])
@@ -36,7 +36,37 @@ def list_movements(
         financial_statement = financial_statement.where(FinancialMovement.movement_type == movement_type.upper())
     inventory_rows = database.execute(inventory_statement.order_by(InventoryMovement.created_at.desc()).limit(100)).all()
     financial_rows = database.execute(financial_statement.order_by(FinancialMovement.created_at.desc()).limit(100)).all()
-    rows = [MovementRow(id=movement.id, domain="inventory", related_id=movement.sale_id, movement_type=movement.movement_type, amount=None, quantity=movement.quantity, concept=movement.observation or movement.movement_type, product_name=product_name, created_at=movement.created_at) for movement, product_name in inventory_rows]
-    rows.extend(MovementRow(id=movement.id, domain="financial", related_id=movement.sale_id, movement_type=movement.movement_type, amount=movement.amount, quantity=quantity if movement.movement_type == "INCOME" else None, concept=movement.concept, product_name=None, created_at=movement.created_at) for movement, quantity in financial_rows)
+    internal_seller_ids = {movement.assigned_seller_id for movement, _ in inventory_rows if movement.assigned_seller_id}
+    internal_sellers = dict(database.execute(select(User.id, User.full_name).where(User.id.in_(internal_seller_ids))).all()) if internal_seller_ids else {}
+    sale_metadata: dict[int, dict[str, object]] = {}
+    sale_ids = {movement.sale_id for movement, _ in inventory_rows if movement.sale_id} | {movement.sale_id for movement, _ in financial_rows if movement.sale_id}
+    if sale_ids:
+        cashier = aliased(User)
+        seller = aliased(User)
+        sale_rows = database.execute(
+            select(Sale.id, Sale.sale_number, Sale.payment_method, Customer.name, seller.full_name, cashier.full_name)
+            .outerjoin(Customer, Customer.id == Sale.customer_id)
+            .outerjoin(seller, seller.id == Sale.assigned_seller_id)
+            .join(cashier, cashier.id == Sale.user_id)
+            .where(Sale.id.in_(sale_ids))
+        ).all()
+        support_rows = database.scalars(select(SaleSupport).where(SaleSupport.sale_id.in_(sale_ids))).all()
+        support_urls: dict[int, list[str]] = {}
+        for support in support_rows:
+            support_urls.setdefault(support.sale_id, []).append(support.file_url)
+        sale_metadata = {sale_id: {"sale_number": sale_number, "payment_method": payment_method, "customer_name": customer_name, "seller_name": seller_name, "cashier_name": cashier_name, "support_urls": support_urls.get(sale_id, [])} for sale_id, sale_number, payment_method, customer_name, seller_name, cashier_name in sale_rows}
+
+    def metadata(sale_id: int | None) -> dict[str, object]:
+        return sale_metadata.get(sale_id, {"sale_number": None, "payment_method": None, "customer_name": None, "seller_name": None, "cashier_name": None, "support_urls": []})
+
+    rows = []
+    for movement, product_name in inventory_rows:
+        extra = metadata(movement.sale_id)
+        if movement.assigned_seller_id:
+            extra["seller_name"] = internal_sellers.get(movement.assigned_seller_id)
+        rows.append(MovementRow(id=movement.id, domain="inventory", related_id=movement.sale_id, movement_type=movement.movement_type, amount=None, quantity=movement.quantity, concept=movement.observation or movement.movement_type, product_name=product_name, created_at=movement.created_at, **extra))
+    for movement, quantity in financial_rows:
+        extra = metadata(movement.sale_id)
+        rows.append(MovementRow(id=movement.id, domain="financial", related_id=movement.sale_id, movement_type=movement.movement_type, amount=movement.amount, quantity=quantity if movement.movement_type == "INCOME" else None, concept=movement.concept, product_name=None, created_at=movement.created_at, **extra))
     rows.sort(key=lambda row: row.created_at, reverse=True)
     return MovementsResponse(movements=rows[:100])

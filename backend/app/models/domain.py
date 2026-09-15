@@ -59,6 +59,15 @@ class UserPermission(Base):
     user: Mapped[User] = relationship(back_populates="permissions")
 
 
+class AlertRead(Base):
+    __tablename__ = "alert_reads"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    alert_id: Mapped[str] = mapped_column(String(120), index=True)
+    read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class Category(Base):
     __tablename__ = "categories"
 
@@ -106,11 +115,22 @@ class Sale(Base):
     sale_number: Mapped[str] = mapped_column(String(30), unique=True, index=True)
     customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    assigned_seller_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), index=True)
     payment_method: Mapped[str] = mapped_column(String(20))
     subtotal: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     total: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
     items: Mapped[List["SaleItem"]] = relationship(back_populates="sale")
+
+
+class SaleSupport(Base):
+    __tablename__ = "sale_supports"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    sale_id: Mapped[int] = mapped_column(ForeignKey("sales.id", ondelete="CASCADE"), index=True)
+    file_url: Mapped[str] = mapped_column(String(500))
+    file_name: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class SaleItem(Base):
@@ -135,6 +155,7 @@ class InventoryMovement(Base):
     quantity: Mapped[Decimal] = mapped_column(Numeric(12, 3))
     stock_after: Mapped[Decimal] = mapped_column(Numeric(12, 3))
     sale_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sales.id"))
+    assigned_seller_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), index=True)
     observation: Mapped[Optional[str]] = mapped_column(Text())
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
@@ -147,9 +168,20 @@ class FinancialMovement(Base):
     movement_type: Mapped[str] = mapped_column(String(20), index=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     concept: Mapped[str] = mapped_column(String(180))
+    payment_method: Mapped[Optional[str]] = mapped_column(String(20))
+    expense_category_id: Mapped[Optional[int]] = mapped_column(ForeignKey("expense_categories.id"), index=True)
     sale_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sales.id"))
     observation: Mapped[Optional[str]] = mapped_column(Text())
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+class ExpenseCategory(Base):
+    __tablename__ = "expense_categories"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class Credit(Base):
