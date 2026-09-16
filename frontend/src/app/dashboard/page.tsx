@@ -478,7 +478,7 @@ export default function DashboardPage() {
               {userName ? `Buen día, ${userName}` : "Dashboard"}
             </h1>
           </div>
-          <div className="ml-auto flex items-center gap-2 lg:hidden">
+          <div className="ml-auto flex items-center gap-2">
             <div className="relative">
               <button
                 aria-label={`Ver notificaciones${unreadAlerts ? ` (${unreadAlerts})` : ""}`}
@@ -538,7 +538,7 @@ export default function DashboardPage() {
               )}
             </div>
 
-            <div className="relative">
+            <div className="relative lg:hidden">
               <button
                 aria-label="Abrir menú de navegación"
                 onClick={() => setMenuOpen((prev) => !prev)}
