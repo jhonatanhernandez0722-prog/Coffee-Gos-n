@@ -14,6 +14,7 @@ import {
   HandCoins,
   LayoutDashboard,
   LogOut,
+  Menu,
   Package,
   Palette,
   QrCode,
@@ -211,6 +212,7 @@ export default function DashboardPage() {
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [unreadAlerts, setUnreadAlerts] = useState(0);
   const [alertsOpen, setAlertsOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [monthlyReport, setMonthlyReport] = useState<MonthlyReport | null>(
     null,
   );
@@ -476,16 +478,16 @@ export default function DashboardPage() {
               {userName ? `Buen día, ${userName}` : "Dashboard"}
             </h1>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <div className="relative">
               <button
                 aria-label={`Ver notificaciones${unreadAlerts ? ` (${unreadAlerts})` : ""}`}
                 onClick={() => void openAlerts()}
-                className="relative grid size-10 place-items-center border border-[var(--line)] text-[var(--muted)] hover:text-[var(--blue-main)]"
+                className="relative grid size-11 place-items-center rounded-xl border border-[var(--line)] bg-white text-[var(--muted)] shadow-sm transition hover:border-[var(--blue-main)] hover:text-[var(--blue-main)]"
               >
                 <Bell size={18} />
                 {unreadAlerts > 0 && (
-                  <span className="absolute -right-1 -top-1 grid min-w-5 place-items-center bg-[var(--blue-main)] px-1 text-[10px] font-bold text-white">
+                  <span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-[var(--blue-main)] px-1 text-[10px] font-bold text-white">
                     {unreadAlerts > 9 ? "9+" : unreadAlerts}
                   </span>
                 )}
@@ -535,10 +537,50 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
+
+            <div className="relative">
+              <button
+                aria-label="Abrir menú de navegación"
+                onClick={() => setMenuOpen((prev) => !prev)}
+                className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold text-[var(--ink)] shadow-sm transition hover:border-[var(--blue-main)] hover:text-[var(--blue-main)]"
+              >
+                <span className="grid size-8 place-items-center rounded-lg bg-[var(--blue-light)] text-[var(--blue-main)]">
+                  <Menu size={16} />
+                </span>
+                <span className="hidden sm:inline">Menú</span>
+              </button>
+
+              {menuOpen && (
+                <div className="absolute right-0 z-20 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-[var(--line)] bg-white p-2 shadow-xl">
+                  <div className="mb-2 flex items-center justify-between px-2 py-1">
+                    <strong className="text-sm text-[var(--ink)]">Navegación</strong>
+                    <button type="button" onClick={() => setMenuOpen(false)} className="text-xs text-[var(--muted)]">Cerrar</button>
+                  </div>
+                  <nav className="grid gap-1">
+                    {navigation
+                      .filter(({ adminOnly, permission }) => isAdmin || (!adminOnly && currentUser?.permissions?.includes(permission)))
+                      .map(({ label, href, icon: Icon }) => (
+                        <Link
+                          key={label}
+                          href={href}
+                          onClick={() => setMenuOpen(false)}
+                          className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold ${href === "/dashboard" ? "bg-[var(--blue-light)] text-[var(--blue-main)]" : "text-[var(--muted)] hover:bg-[var(--canvas)] hover:text-[var(--ink)]"}`}
+                        >
+                          <span className="grid size-7 place-items-center rounded-lg bg-white text-[var(--blue-main)]">
+                            <Icon size={15} />
+                          </span>
+                          <span>{label}</span>
+                        </Link>
+                      ))}
+                  </nav>
+                </div>
+              )}
+            </div>
+
             <Link
               href="/"
               aria-label="Cerrar sesión"
-              className="grid size-10 place-items-center border border-[var(--line)] text-[var(--muted)] hover:text-[var(--blue-main)]"
+              className="grid size-11 place-items-center rounded-xl border border-[var(--line)] bg-white text-[var(--muted)] shadow-sm transition hover:border-[var(--blue-main)] hover:text-[var(--blue-main)]"
             >
               <LogOut size={17} />
             </Link>

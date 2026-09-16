@@ -33,6 +33,7 @@ export function AdminPage({ title, description, children }: { title: string; des
   const [accessChecked, setAccessChecked] = useState(false);
   const [homeRoute, setHomeRoute] = useState("/dashboard");
   const [currentUser, setCurrentUser] = useState<{ role?: string; permissions?: string[] } | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const isAdminUser = currentUser?.role === "ADMIN";
   const visibleNavigation = navigation.filter((item) => {
     if (!currentUser || isAdminUser) return true;
@@ -113,9 +114,34 @@ export function AdminPage({ title, description, children }: { title: string; des
   return (
     <main className="min-h-screen bg-[var(--canvas)]">
       <header className="border-b border-[var(--line)] bg-white px-4 py-4 sm:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-6">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
           <Link href="/dashboard" className="flex items-center gap-3 font-semibold"><span className="grid size-9 place-items-center bg-[var(--blue-main)] text-white"><Coffee size={18} /></span>Coffee Gosen</Link>
-          <Link href={homeRoute} className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[var(--muted)] hover:text-[var(--blue-main)]"><ArrowLeft size={16} /> Volver</Link>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMenuOpen((prev) => !prev)}
+                className="inline-flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold text-[var(--ink)] shadow-sm transition hover:border-[var(--blue-main)] hover:text-[var(--blue-main)]"
+              >
+                <span className="grid size-8 place-items-center rounded-lg bg-[var(--blue-light)] text-[var(--blue-main)]"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M4 7h16M4 12h16M4 17h16" /></svg></span>
+                <span className="hidden sm:inline">Menú</span>
+              </button>
+              {menuOpen && (
+                <div className="absolute right-0 z-20 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-2xl border border-[var(--line)] bg-white p-2 shadow-xl">
+                  <div className="mb-2 flex items-center justify-between px-2 py-1">
+                    <strong className="text-sm text-[var(--ink)]">Navegación</strong>
+                    <button type="button" onClick={() => setMenuOpen(false)} className="text-xs text-[var(--muted)]">Cerrar</button>
+                  </div>
+                  <nav className="grid gap-1">
+                    {visibleNavigation.map(({ href, label, icon: Icon }) => (
+                      <Link key={href} href={href} onClick={() => setMenuOpen(false)} className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold ${pathname === href ? "bg-[var(--blue-light)] text-[var(--blue-main)]" : "text-[var(--muted)] hover:bg-[var(--canvas)] hover:text-[var(--ink)]"}`}><span className="grid size-7 place-items-center rounded-lg bg-white text-[var(--blue-main)]"><Icon size={15} /></span>{label}</Link>
+                    ))}
+                  </nav>
+                </div>
+              )}
+            </div>
+            <Link href={homeRoute} className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[var(--muted)] hover:text-[var(--blue-main)]"><ArrowLeft size={16} /> Volver</Link>
+          </div>
         </div>
       </header>
 
