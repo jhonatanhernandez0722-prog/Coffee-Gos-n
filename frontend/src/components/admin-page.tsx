@@ -134,7 +134,7 @@ export function AdminPage({ title, description, children }: { title: string; des
         </div>
       </nav>
 
-      <details className="group border-b border-[var(--line)] bg-white px-4 py-3 lg:hidden sm:px-6">
+      <details className="group border-b border-[var(--line)] bg-white px-4 py-3 sm:px-6">
         <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--ink)] outline-none ring-0 transition-colors hover:border-[var(--blue-main)] focus:ring-2 focus:ring-[var(--blue-main)] [&::-webkit-details-marker]:hidden">
           <span className="flex items-center gap-3"><span className="grid size-8 place-items-center rounded-lg bg-[var(--blue-light)] text-[var(--blue-main)]">{(() => { const Icon = accessByRoute[pathname]?.icon ?? LayoutDashboard; return <Icon size={16} />; })()}</span>{accessByRoute[pathname]?.label ?? "Ir a sección"}</span>
           <ChevronDown aria-hidden="true" size={19} className="text-[var(--muted)] transition-transform group-open:rotate-180" />
