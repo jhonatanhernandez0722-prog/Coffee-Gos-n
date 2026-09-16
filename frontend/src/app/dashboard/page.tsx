@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowUpRight,
   BarChart3,
@@ -93,7 +93,6 @@ const apiUrl =
   (process.env.NODE_ENV === "production"
     ? "https://backend-lemon-five-80.vercel.app/api/v1"
     : "http://localhost:8001/api/v1");
-  const bellSoundStorageKey = "coffee_gosen_bell_sound_enabled";
 const navigation = [
   {
     label: "Resumen",
@@ -220,7 +219,6 @@ export default function DashboardPage() {
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [unreadAlerts, setUnreadAlerts] = useState(0);
   const [alertsOpen, setAlertsOpen] = useState(false);
-  const previousUnreadAlerts = useRef<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [monthlyReport, setMonthlyReport] = useState<MonthlyReport | null>(
     null,
@@ -312,18 +310,6 @@ export default function DashboardPage() {
         alerts: AlertItem[];
         unread_count: number;
       };
-      const soundEnabled = window.localStorage.getItem(bellSoundStorageKey) !== "false";
-      if (soundEnabled && previousUnreadAlerts.current !== null && result.unread_count > previousUnreadAlerts.current) {
-        const audio = new Audio("/Campana%20Tibetana%20Mini.mp3");
-        audio.volume = 0.65;
-        audio.addEventListener("loadedmetadata", () => {
-          const segmentLength = Math.min(2.4, audio.duration);
-          const maxStart = Math.max(0, audio.duration - segmentLength);
-          audio.currentTime = Math.random() * maxStart;
-          void audio.play().catch(() => undefined);
-        }, { once: true });
-      }
-      previousUnreadAlerts.current = result.unread_count;
       setAlerts(result.alerts);
       setUnreadAlerts(result.unread_count);
     };
