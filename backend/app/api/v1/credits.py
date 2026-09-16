@@ -6,9 +6,8 @@ from sqlalchemy.orm import Session, aliased
 
 from app.core.permissions import require_section
 from app.db.session import get_db
-from app.models import Credit, Customer, Sale, SaleSupport, User
 from app.models import Credit, Customer, Product, Sale, SaleItem, SaleSupport, User
-from app.schemas.credits import CreditRow, CreditsResponse
+from app.schemas.credits import CreditProduct, CreditRow, CreditsResponse
 
 router = APIRouter(prefix="/credits", tags=["credits"])
 
