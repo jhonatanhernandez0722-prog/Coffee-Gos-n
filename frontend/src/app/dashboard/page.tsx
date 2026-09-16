@@ -92,6 +92,24 @@ const apiUrl =
   (process.env.NODE_ENV === "production"
     ? "https://backend-lemon-five-80.vercel.app/api/v1"
     : "http://localhost:8001/api/v1");
+const menuEmojis: Record<string, string> = {
+  Resumen: "📊",
+  Ventas: "🧾",
+  Productos: "📦",
+  Clientes: "👥",
+  Créditos: "💳",
+  Movimientos: "📜",
+  Vendedores: "👤",
+  "Egresos y costo": "💸",
+  Ingresar: "💰",
+  Donaciones: "🤝",
+  "QR de pago": "📱",
+  Métricas: "📈",
+  "Arqueo de Caja": "🧮",
+  "Balance General": "⚖️",
+  Temas: "🎨",
+};
+
 const navigation = [
   {
     label: "Resumen",
@@ -478,7 +496,7 @@ export default function DashboardPage() {
               {userName ? `Buen día, ${userName}` : "Dashboard"}
             </h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-2 lg:hidden">
             <div className="relative">
               <button
                 aria-label={`Ver notificaciones${unreadAlerts ? ` (${unreadAlerts})` : ""}`}
@@ -542,16 +560,15 @@ export default function DashboardPage() {
               <button
                 aria-label="Abrir menú de navegación"
                 onClick={() => setMenuOpen((prev) => !prev)}
-                className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold text-[var(--ink)] shadow-sm transition hover:border-[var(--blue-main)] hover:text-[var(--blue-main)]"
+                className="flex items-center justify-center rounded-xl border border-[var(--line)] bg-white p-2 text-[var(--ink)] shadow-sm transition hover:border-[var(--blue-main)] hover:text-[var(--blue-main)]"
               >
-                <span className="grid size-8 place-items-center rounded-lg bg-[var(--blue-light)] text-[var(--blue-main)]">
-                  <Menu size={16} />
+                <span className="grid size-8 place-items-center rounded-lg bg-[var(--blue-light)] text-lg text-[var(--blue-main)]">
+                  ☰
                 </span>
-                <span className="hidden sm:inline">Menú</span>
               </button>
 
               {menuOpen && (
-                <div className="absolute right-0 z-20 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-[var(--line)] bg-white p-2 shadow-xl">
+                <div className="absolute right-0 z-20 mt-2 w-[min(18rem,calc(100vw-2.5rem))] rounded-2xl border border-[var(--line)] bg-white p-2 shadow-xl">
                   <div className="mb-2 flex items-center justify-between px-2 py-1">
                     <strong className="text-sm text-[var(--ink)]">Navegación</strong>
                     <button type="button" onClick={() => setMenuOpen(false)} className="text-xs text-[var(--muted)]">Cerrar</button>
@@ -564,12 +581,12 @@ export default function DashboardPage() {
                           key={label}
                           href={href}
                           onClick={() => setMenuOpen(false)}
-                          className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold ${href === "/dashboard" ? "bg-[var(--blue-light)] text-[var(--blue-main)]" : "text-[var(--muted)] hover:bg-[var(--canvas)] hover:text-[var(--ink)]"}`}
+                          className={`flex items-center gap-2 rounded-xl px-2 py-2 text-[11px] font-semibold ${href === "/dashboard" ? "bg-[var(--blue-light)] text-[var(--blue-main)]" : "text-[var(--muted)] hover:bg-[var(--canvas)] hover:text-[var(--ink)]"}`}
                         >
-                          <span className="grid size-7 place-items-center rounded-lg bg-white text-[var(--blue-main)]">
-                            <Icon size={15} />
+                          <span className="grid size-6 place-items-center rounded-md bg-white text-[var(--blue-main)] text-[12px]">
+                            {menuEmojis[label] ?? "•"}
                           </span>
-                          <span>{label}</span>
+                          <span className="truncate">{label}</span>
                         </Link>
                       ))}
                   </nav>
