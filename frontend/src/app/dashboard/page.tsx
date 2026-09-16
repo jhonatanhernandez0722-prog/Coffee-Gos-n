@@ -493,7 +493,7 @@ export default function DashboardPage() {
                 )}
               </button>
               {alertsOpen && (
-                <div className="absolute left-1/2 z-10 mt-2 w-[min(22rem,calc(100vw-3rem))] -translate-x-1/2 border border-[var(--line)] bg-white shadow-xl">
+                <div className="fixed left-1/2 top-24 z-50 w-[min(22rem,calc(100vw-1.5rem))] -translate-x-1/2 border border-[var(--line)] bg-white shadow-xl">
                   <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
                     <strong className="text-sm">Alertas</strong>
                     <span className="text-xs text-[var(--muted)]">
@@ -550,7 +550,7 @@ export default function DashboardPage() {
               </button>
 
               {menuOpen && (
-                <div className="absolute left-1/2 z-20 mt-2 w-[min(18rem,calc(100vw-1.5rem))] -translate-x-1/2 rounded-2xl border border-[var(--line)] bg-white p-2 shadow-xl">
+                <div className="fixed left-1/2 top-24 z-50 w-[min(18rem,calc(100vw-1.5rem))] -translate-x-1/2 rounded-2xl border border-[var(--line)] bg-white p-2 shadow-xl">
                   <div className="mb-2 flex items-center justify-between px-2 py-1">
                     <strong className="text-sm text-[var(--ink)]">Navegación</strong>
                     <button type="button" onClick={() => setMenuOpen(false)} className="text-xs text-[var(--muted)]">Cerrar</button>
