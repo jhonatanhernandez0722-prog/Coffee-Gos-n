@@ -32,9 +32,24 @@ def dashboard_summary(
     income_today = database.scalar(
         select(func.coalesce(func.sum(FinancialMovement.amount), 0)).where(
             FinancialMovement.movement_type == "INCOME",
+            FinancialMovement.sale_id.is_not(None),
             financial_date >= start_of_day,
             financial_date < end_of_day,
             ~select(Credit.id).where(Credit.sale_id == FinancialMovement.sale_id, Credit.status == "PENDING").exists(),
+        )
+    ) or Decimal("0")
+    donation_income_total = database.scalar(
+        select(func.coalesce(func.sum(FinancialMovement.amount), 0)).where(
+            FinancialMovement.movement_type == "INCOME",
+            FinancialMovement.income_type == "DONATION",
+            FinancialMovement.sale_id.is_(None),
+        )
+    ) or Decimal("0")
+    previous_income_total = database.scalar(
+        select(func.coalesce(func.sum(FinancialMovement.amount), 0)).where(
+            FinancialMovement.movement_type == "INCOME",
+            FinancialMovement.income_type == "OLD_INCOME",
+            FinancialMovement.sale_id.is_(None),
         )
     ) or Decimal("0")
     expenses_today = database.scalar(
@@ -118,6 +133,8 @@ def dashboard_summary(
         cash_balance=cash_balance,
         nequi_balance=nequi_balance,
         income_today=income_today,
+        donation_income_total=donation_income_total,
+        previous_income_total=previous_income_total,
         expenses_today=expenses_today,
         cost_today=cost_today,
         profit_today=income_today - cost_today - expenses_today,

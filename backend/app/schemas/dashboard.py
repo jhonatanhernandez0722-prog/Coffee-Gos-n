@@ -19,6 +19,8 @@ class DashboardSummary(BaseModel):
     cash_balance: Decimal
     nequi_balance: Decimal
     income_today: Decimal
+    donation_income_total: Decimal
+    previous_income_total: Decimal
     expenses_today: Decimal
     cost_today: Decimal
     profit_today: Decimal

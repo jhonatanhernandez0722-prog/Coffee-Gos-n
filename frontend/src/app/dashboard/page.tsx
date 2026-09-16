@@ -34,6 +34,8 @@ type DashboardSummary = {
   cash_balance: number;
   nequi_balance: number;
   income_today: number;
+  donation_income_total: number;
+  previous_income_total: number;
   expenses_today: number;
   cost_today: number;
   profit_today: number;
@@ -356,6 +358,20 @@ export default function DashboardPage() {
           detail: `Egresos ${formatCurrency(summary.expenses_today)}`,
           icon: Package,
         },
+        {
+          label: "Donaciones digitadas",
+          value: formatCurrency(summary.donation_income_total),
+          detail: "Ingresos registrados, no ventas de hoy",
+          icon: HandCoins,
+          href: "/donaciones",
+        },
+        {
+          label: "Ingresos anteriores",
+          value: formatCurrency(summary.previous_income_total),
+          detail: "Ingresos históricos digitados",
+          icon: WalletCards,
+          href: "/ingresar",
+        },
       ]
     : [];
   const operatingMetrics: DashboardMetric[] = summary
@@ -393,6 +409,8 @@ export default function DashboardPage() {
           Fecha: summary.date,
           "Saldo total": summary.balance_total,
           "Ingresos de hoy": summary.income_today,
+          "Donaciones digitadas": summary.donation_income_total,
+          "Ingresos anteriores": summary.previous_income_total,
           "Egresos de hoy": summary.expenses_today,
           Costos: summary.cost_today,
           Ganancia: summary.profit_today,
