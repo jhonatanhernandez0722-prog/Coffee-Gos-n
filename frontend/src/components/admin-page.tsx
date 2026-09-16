@@ -3,24 +3,26 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Coffee } from "lucide-react";
+import { ArrowLeft, BarChart3, CircleDollarSign, Coffee, CreditCard, HandCoins, LayoutDashboard, Package, Palette, QrCode, ReceiptText, Scale, ShoppingBag, UserRound, Users, WalletCards } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
-const accessByRoute: Record<string, { key: string; label: string; href: string }> = {
-  "/dashboard": { key: "dashboard", label: "Resumen", href: "/dashboard" },
-  "/comanda": { key: "comanda", label: "Ventas", href: "/comanda" },
-  "/productos": { key: "productos", label: "Productos", href: "/productos" },
-  "/clientes": { key: "clientes", label: "Clientes", href: "/clientes" },
-  "/creditos": { key: "creditos", label: "Créditos", href: "/creditos" },
-  "/movimientos": { key: "movimientos", label: "Movimientos", href: "/movimientos" },
-  "/vendedores": { key: "admin", label: "Vendedores", href: "/vendedores" },
-  "/egresos": { key: "egresos", label: "Egresos y costo", href: "/egresos" },
-  "/ingresar": { key: "ingresos", label: "Ingresar", href: "/ingresar" },
-  "/donaciones": { key: "donaciones", label: "Donaciones", href: "/donaciones" },
-  "/qr-pago": { key: "qr_pago", label: "QR de pago", href: "/qr-pago" },
-  "/metricas": { key: "metricas", label: "Métricas", href: "/metricas" },
-  "/arqueo": { key: "arqueo", label: "Arqueo de Caja", href: "/arqueo" },
-  "/balance": { key: "balance", label: "Balance General", href: "/balance" },
-  "/temas": { key: "temas", label: "Temas", href: "/temas" },
+type RouteItem = { key: string; label: string; href: string; icon: LucideIcon };
+const accessByRoute: Record<string, RouteItem> = {
+  "/dashboard": { key: "dashboard", label: "Resumen", href: "/dashboard", icon: LayoutDashboard },
+  "/comanda": { key: "comanda", label: "Ventas", href: "/comanda", icon: ShoppingBag },
+  "/productos": { key: "productos", label: "Productos", href: "/productos", icon: Package },
+  "/clientes": { key: "clientes", label: "Clientes", href: "/clientes", icon: Users },
+  "/creditos": { key: "creditos", label: "Créditos", href: "/creditos", icon: CreditCard },
+  "/movimientos": { key: "movimientos", label: "Movimientos", href: "/movimientos", icon: ReceiptText },
+  "/vendedores": { key: "admin", label: "Vendedores", href: "/vendedores", icon: UserRound },
+  "/egresos": { key: "egresos", label: "Egresos y costo", href: "/egresos", icon: ReceiptText },
+  "/ingresar": { key: "ingresos", label: "Ingresar", href: "/ingresar", icon: CircleDollarSign },
+  "/donaciones": { key: "donaciones", label: "Donaciones", href: "/donaciones", icon: HandCoins },
+  "/qr-pago": { key: "qr_pago", label: "QR de pago", href: "/qr-pago", icon: QrCode },
+  "/metricas": { key: "metricas", label: "Métricas", href: "/metricas", icon: BarChart3 },
+  "/arqueo": { key: "arqueo", label: "Arqueo de Caja", href: "/arqueo", icon: WalletCards },
+  "/balance": { key: "balance", label: "Balance General", href: "/balance", icon: Scale },
+  "/temas": { key: "temas", label: "Temas", href: "/temas", icon: Palette },
 };
 const navigation = Object.values(accessByRoute).filter((item) => item.key !== "admin");
 
@@ -110,13 +112,15 @@ export function AdminPage({ title, description, children }: { title: string; des
           <Link href={homeRoute} className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[var(--muted)] hover:text-[var(--blue-main)]"><ArrowLeft size={16} /> Volver</Link>
         </div>
       </header>
-      <div className="border-b border-[var(--line)] bg-white px-6 py-3 lg:hidden">
-        <label className="block text-xs font-semibold text-[var(--muted)]" htmlFor="tablet-navigation">Ir a sección
-          <select id="tablet-navigation" value={pathname} onChange={(event) => router.push(event.target.value)} className="mt-2 min-h-11 w-full border border-[var(--line)] bg-white px-3 text-sm font-semibold text-[var(--ink)] focus:border-[var(--blue-main)]">
-            {navigation.filter((item) => currentUser?.role === "ADMIN" || currentUser?.permissions?.includes(item.key)).map((item) => <option key={item.href} value={item.href}>{item.label}</option>)}
-          </select>
-        </label>
-      </div>
+      <details className="group border-b border-[var(--line)] bg-white px-4 py-3 lg:hidden">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between border border-[var(--line)] px-3 text-sm font-semibold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--blue-main)] [&::-webkit-details-marker]:hidden">
+          <span className="flex items-center gap-3"><span className="grid size-8 place-items-center bg-[var(--blue-light)] text-[var(--blue-main)]">{(() => { const Icon = accessByRoute[pathname]?.icon ?? LayoutDashboard; return <Icon size={16} />; })()}</span>{accessByRoute[pathname]?.label ?? "Ir a sección"}</span>
+          <span aria-hidden="true" className="text-lg text-[var(--muted)] transition group-open:rotate-180">⌄</span>
+        </summary>
+        <nav className="mt-2 grid gap-1 border border-[var(--line)] bg-[var(--canvas)] p-2" aria-label="Navegación de secciones">
+          {navigation.filter((item) => currentUser?.role === "ADMIN" || currentUser?.permissions?.includes(item.key)).map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`flex min-h-11 items-center gap-3 px-3 text-sm font-semibold ${pathname === href ? "bg-[var(--blue-light)] text-[var(--blue-main)]" : "text-[var(--muted)] hover:bg-white hover:text-[var(--ink)]"}`}><Icon size={17} />{label}</Link>)}
+        </nav>
+      </details>
       <section className="mx-auto max-w-7xl px-6 py-10 lg:px-10"><p className="text-sm text-[var(--muted)]">Operación</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">{title}</h1><p className="mt-3 max-w-2xl text-[var(--muted)]">{description}</p><div className="mt-8">{children}</div></section>
     </main>
   );

@@ -27,7 +27,7 @@ from app.models import (
 from app.schemas.sales import SaleCreate, SaleItemResponse, SaleResponse
 
 router = APIRouter(prefix="/sales", tags=["sales"])
-media_directory = Path(__file__).resolve().parents[3] / "storage"
+media_directory = Path("/tmp/coffee-gosen-media") if settings.environment == "production" else Path(__file__).resolve().parents[3] / "storage"
 
 
 @router.post("", response_model=SaleResponse, status_code=status.HTTP_201_CREATED)
