@@ -118,13 +118,29 @@ export function AdminPage({ title, description, children }: { title: string; des
           <Link href={homeRoute} className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[var(--muted)] hover:text-[var(--blue-main)]"><ArrowLeft size={16} /> Volver</Link>
         </div>
       </header>
-      <details className="group border-b border-[var(--line)] bg-white px-4 py-3 2xl:hidden sm:px-6 lg:px-8">
-        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between border border-[var(--line)] bg-[var(--surface)] px-3 text-sm font-semibold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--blue-main)] [&::-webkit-details-marker]:hidden">
-          <span className="flex items-center gap-3"><span className="grid size-8 place-items-center bg-[var(--blue-light)] text-[var(--blue-main)]">{(() => { const Icon = accessByRoute[pathname]?.icon ?? LayoutDashboard; return <Icon size={16} />; })()}</span>{accessByRoute[pathname]?.label ?? "Ir a sección"}</span>
+
+      <nav className="hidden border-b border-[var(--line)] bg-white/90 px-4 py-3 backdrop-blur lg:block">
+        <div className="mx-auto flex max-w-7xl gap-2 overflow-x-auto pb-1">
+          {visibleNavigation.map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              className={`inline-flex min-h-12 shrink-0 items-center gap-2 rounded-xl border px-4 text-sm font-semibold transition-colors ${pathname === href ? "border-[var(--blue-main)] bg-[var(--blue-light)] text-[var(--blue-main)]" : "border-[var(--line)] bg-[var(--surface)] text-[var(--muted)] hover:border-[var(--blue-main)] hover:text-[var(--blue-main)]"}`}
+            >
+              <Icon size={16} />
+              {label}
+            </Link>
+          ))}
+        </div>
+      </nav>
+
+      <details className="group border-b border-[var(--line)] bg-white px-4 py-3 lg:hidden sm:px-6">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--ink)] outline-none ring-0 transition-colors hover:border-[var(--blue-main)] focus:ring-2 focus:ring-[var(--blue-main)] [&::-webkit-details-marker]:hidden">
+          <span className="flex items-center gap-3"><span className="grid size-8 place-items-center rounded-lg bg-[var(--blue-light)] text-[var(--blue-main)]">{(() => { const Icon = accessByRoute[pathname]?.icon ?? LayoutDashboard; return <Icon size={16} />; })()}</span>{accessByRoute[pathname]?.label ?? "Ir a sección"}</span>
           <ChevronDown aria-hidden="true" size={19} className="text-[var(--muted)] transition-transform group-open:rotate-180" />
         </summary>
-        <nav className="mt-2 grid gap-1 border border-[var(--line)] bg-[var(--canvas)] p-2 sm:grid-cols-2 lg:grid-cols-3" aria-label="Navegación de secciones">
-          {visibleNavigation.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`flex min-h-12 items-center gap-3 px-3 text-sm font-semibold ${pathname === href ? "bg-[var(--blue-light)] text-[var(--blue-main)]" : "text-[var(--muted)] hover:bg-white hover:text-[var(--ink)]"}`}><Icon size={17} />{label}</Link>)}
+        <nav className="mt-2 grid gap-2 border border-[var(--line)] bg-[var(--canvas)] p-2 sm:grid-cols-2" aria-label="Navegación de secciones">
+          {visibleNavigation.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`flex min-h-12 items-center gap-3 rounded-lg px-3 text-sm font-semibold ${pathname === href ? "bg-[var(--blue-light)] text-[var(--blue-main)]" : "text-[var(--muted)] hover:bg-white hover:text-[var(--ink)]"}`}><Icon size={17} />{label}</Link>)}
         </nav>
       </details>
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10"><p className="text-sm text-[var(--muted)]">Operación</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">{title}</h1><p className="mt-3 max-w-2xl text-[var(--muted)]">{description}</p><div className="mt-8">{children}</div></section>
