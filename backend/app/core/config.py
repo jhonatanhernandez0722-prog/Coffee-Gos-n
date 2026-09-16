@@ -1,6 +1,9 @@
+import json
 from pathlib import Path
+from typing import Annotated
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -8,7 +11,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://coffee:coffee@localhost:5432/coffee_gosen"
     secret_key: str = "change-me-in-local-env"
     access_token_expire_minutes: int = 180
-    cors_origins: list[str] = [
+    cors_origins: Annotated[list[str], NoDecode] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "https://frontend-jade-phi-5kpqyple00.vercel.app",
@@ -26,6 +29,24 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value: object) -> list[str]:
+        if isinstance(value, list):
+            return [str(origin).strip() for origin in value if str(origin).strip()]
+        if not isinstance(value, str):
+            return []
+        raw_value = value.strip()
+        if not raw_value:
+            return []
+        try:
+            parsed = json.loads(raw_value)
+            if isinstance(parsed, list):
+                return [str(origin).strip() for origin in parsed if str(origin).strip()]
+        except json.JSONDecodeError:
+            pass
+        return [origin.strip() for origin in raw_value.split(",") if origin.strip()]
 
     @property
     def sqlalchemy_database_url(self) -> str:
