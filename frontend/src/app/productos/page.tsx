@@ -21,7 +21,7 @@ type Product = {
 };
 
 type Category = { id: number; name: string; is_active: boolean };
-type Section = "sale" | "insumos" | "desechables";
+type Section = "sale" | "insumos" | "desechables" | "limpieza";
 type Seller = { id: number; full_name: string };
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ??
@@ -36,7 +36,19 @@ const money = (value: number) =>
     maximumFractionDigits: 0,
   }).format(value);
 
-const imageUrl = (path: string) => path.startsWith("http") ? path : `${apiUrl.replace("/api/v1", "")}${path}`;
+const imageUrl = (path?: string | null) => {
+  if (!path?.trim()) return null;
+  const trimmedPath = path.trim();
+  if (/^https?:\/\//i.test(trimmedPath)) return trimmedPath;
+  try {
+    const baseUrl = apiUrl.replace("/api/v1", "");
+    const candidate = trimmedPath.startsWith("/") ? `${baseUrl}${trimmedPath}` : `${baseUrl}/${trimmedPath}`;
+    new URL(candidate);
+    return candidate;
+  } catch {
+    return null;
+  }
+};
 
 const apiError = (result: { detail?: string | { msg?: string }[] }, fallback: string) =>
   Array.isArray(result.detail)
@@ -273,7 +285,7 @@ export default function ProductsPage() {
         return;
       }
 
-      const inventoryCategoryName = section === "desechables" ? "Desechables" : "Insumos";
+      const inventoryCategoryName = section === "desechables" ? "Desechables" : section === "limpieza" ? "Gosen Limpieza" : "Insumos";
       let category = section === "sale"
         ? categories.find((item) => item.id === Number(categorySelection))
         : categories.find((item) => item.name.toLowerCase() === inventoryCategoryName.toLowerCase());
@@ -460,7 +472,7 @@ export default function ProductsPage() {
     const name = categoryName(product);
     const matchesSection = section === "sale"
       ? product.is_saleable
-      : !product.is_saleable && (section === "desechables" ? name === "desechables" : name === "insumos" || name === "aseo");
+      : !product.is_saleable && (section === "desechables" ? name === "desechables" : section === "limpieza" ? name === "gosen limpieza" : name === "insumos" || name === "aseo");
     return matchesSection && product.name.toLowerCase().includes(search.toLowerCase());
   });
   const stockMetrics = {
@@ -546,6 +558,13 @@ export default function ProductsPage() {
         >
           Gosén · Desechables
         </button>
+        <button
+          type="button"
+          onClick={() => setSection("limpieza")}
+          className={`min-h-11 border-b-2 px-4 text-sm font-semibold ${section === "limpieza" ? "border-[var(--blue-main)] text-[var(--blue-main)]" : "border-transparent text-[var(--muted)]"}`}
+        >
+          Gosen Limpieza
+        </button>
       </div>
 
       {section !== "sale" && (
@@ -585,7 +604,7 @@ export default function ProductsPage() {
         <form onSubmit={saveProduct} className="mt-6 border border-[var(--blue-secondary)] bg-white p-6">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">
-              {editing ? "Editar producto" : section === "sale" ? "Crear producto" : `Añadir ${section === "desechables" ? "desechable" : "insumo"}`}
+              {editing ? "Editar producto" : section === "sale" ? "Crear producto" : `Añadir ${section === "desechables" ? "desechable" : section === "limpieza" ? "producto de limpieza" : "insumo"}`}
             </h2>
             <button type="button" onClick={() => setShowForm(false)} aria-label="Cerrar formulario">
               <X size={19} />
@@ -767,7 +786,7 @@ export default function ProductsPage() {
                 )}
                 <div className="min-w-0">
                   <h3 className="truncate text-base font-semibold">{product.name}</h3>
-                  <p className="text-xs text-[var(--muted)]">{section === "sale" ? `Categoría #${product.category_id}` : section === "desechables" ? "Desechable" : "Insumo"}</p>
+                  <p className="text-xs text-[var(--muted)]">{section === "sale" ? `Categoría #${product.category_id}` : section === "desechables" ? "Desechable" : section === "limpieza" ? "Gosen Limpieza" : "Insumo"}</p>
                 </div>
               </div>
               <span className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${product.is_active ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-600"}`}>

@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from pathlib import Path
 import httpx
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -118,8 +118,12 @@ async def upload_sale_supports(
     sale_id: int,
     files: list[UploadFile] = File(...),
     database: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_section("comanda")),
 ) -> dict[str, list[str]]:
+    return {"support_urls": await save_sale_supports(sale_id, files, database)}
+
+
+async def save_sale_supports(sale_id: int, files: list[UploadFile], database: Session) -> list[str]:
     sale = database.get(Sale, sale_id)
     if sale is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sale not found")
@@ -146,4 +150,23 @@ async def upload_sale_supports(
         database.add(SaleSupport(sale_id=sale_id, file_url=url, file_name=file.filename or filename))
         urls.append(url)
     database.commit()
-    return {"support_urls": urls}
+    return urls
+
+
+@router.post("/with-supports", response_model=SaleResponse, status_code=status.HTTP_201_CREATED)
+async def create_sale_with_supports(
+    payload: str = Form(...),
+    files: list[UploadFile] = File(default=[]),
+    database: Session = Depends(get_db),
+    current_user: User = Depends(require_section("comanda")),
+) -> SaleResponse:
+    try:
+        sale_payload = SaleCreate.model_validate_json(payload)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Los datos de la venta no son válidos") from error
+    if files and sale_payload.payment_method != "NEQUI":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Los soportes solo aplican para pagos con Nequi")
+    sale_response = create_sale(sale_payload, database, current_user)
+    if files:
+        sale_response.support_urls = await save_sale_supports(sale_response.id, files, database)
+    return sale_response

@@ -16,7 +16,11 @@ class CreditRow(BaseModel):
     status: str
     created_at: datetime
     support_urls: list[str] = []
+    products: list["CreditProduct"] = []
 
+class CreditProduct(BaseModel):
+    name: str
+    quantity: Decimal
 
 class CreditsResponse(BaseModel):
     credits: list[CreditRow]

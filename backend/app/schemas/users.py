@@ -6,6 +6,7 @@ class SellerCreate(BaseModel):
     email: EmailStr
     pin: str = Field(pattern=r"^\d{4,8}$")
     permissions: list[str] = Field(default_factory=list)
+    role: str = Field(default="SELLER", pattern="^(SELLER|VIEWER)$")
 
 
 class SellerUpdate(BaseModel):
@@ -14,6 +15,7 @@ class SellerUpdate(BaseModel):
     pin: str | None = Field(default=None, pattern=r"^\d{4,8}$")
     permissions: list[str] | None = None
     is_active: bool | None = None
+    role: str | None = Field(default=None, pattern="^(SELLER|VIEWER)$")
 
 
 class SellerResponse(BaseModel):

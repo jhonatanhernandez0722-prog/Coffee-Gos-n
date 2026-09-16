@@ -10,6 +10,8 @@ from app.api.v1.customers import router as customers_router
 from app.api.v1.credits import router as credits_router
 from app.api.v1.movements import router as movements_router
 from app.api.v1.inventory import router as inventory_router
+from app.api.v1.incomes import router as incomes_router
+from app.api.v1.financial_reports import router as financial_reports_router
 from app.api.v1.users import router as users_router
 
 api_router = APIRouter()
@@ -23,6 +25,8 @@ api_router.include_router(customers_router)
 api_router.include_router(credits_router)
 api_router.include_router(movements_router)
 api_router.include_router(inventory_router)
+api_router.include_router(incomes_router)
+api_router.include_router(financial_reports_router)
 api_router.include_router(users_router)
 
 
@@ -36,5 +40,5 @@ def metadata() -> dict[str, list[str]]:
     return {
         "payment_methods": ["CASH", "NEQUI", "CREDIT"],
         "inventory_movement_types": ["PURCHASE", "SALE", "ADJUSTMENT", "INTERNAL_USE"],
-        "roles": ["ADMIN", "SELLER"],
+        "roles": ["ADMIN", "SELLER", "VIEWER"],
     }

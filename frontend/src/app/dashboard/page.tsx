@@ -11,14 +11,19 @@ import {
   Coffee,
   CreditCard,
   Download,
+  HandCoins,
   LayoutDashboard,
   LogOut,
   Package,
+  Palette,
+  QrCode,
   ReceiptText,
+  Scale,
   ShoppingBag,
   TriangleAlert,
   UserCog,
   Users,
+  WalletCards,
 } from "lucide-react";
 import { downloadExcel } from "@/lib/excel";
 
@@ -124,16 +129,52 @@ const navigation = [
     permission: "admin",
   },
   {
-    label: "Egresos",
+    label: "Egresos y costo",
     href: "/egresos",
     icon: ReceiptText,
     permission: "egresos",
+  },
+  {
+    label: "Ingresar",
+    href: "/ingresar",
+    icon: CircleDollarSign,
+    permission: "ingresos",
+  },
+  {
+    label: "Donaciones",
+    href: "/donaciones",
+    icon: HandCoins,
+    permission: "donaciones",
+  },
+  {
+    label: "QR de pago",
+    href: "/qr-pago",
+    icon: QrCode,
+    permission: "qr_pago",
   },
   {
     label: "Métricas",
     href: "/metricas",
     icon: BarChart3,
     permission: "metricas",
+  },
+  {
+    label: "Arqueo de Caja",
+    href: "/arqueo",
+    icon: WalletCards,
+    permission: "arqueo",
+  },
+  {
+    label: "Balance General",
+    href: "/balance",
+    icon: Scale,
+    permission: "balance",
+  },
+  {
+    label: "Temas",
+    href: "/temas",
+    icon: Palette,
+    permission: "temas",
   },
 ];
 
@@ -369,7 +410,7 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-[var(--canvas)] lg:grid lg:grid-cols-[248px_1fr]">
-      <aside className="hidden border-r border-[var(--line)] bg-white p-5 lg:flex lg:flex-col">
+      <aside className="hidden border-r border-[var(--line)] bg-white p-5 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:overflow-y-auto">
         <Link
           href="/"
           className="mb-12 flex items-center gap-3 font-semibold tracking-tight"

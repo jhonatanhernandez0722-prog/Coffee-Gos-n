@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Coffee, LockKeyhole } from "lucide-react";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "https://backend-lemon-five-80.vercel.app/api/v1" : "http://localhost:8001/api/v1");
-const sectionRoutes: Record<string, string> = { dashboard: "/dashboard", comanda: "/comanda", productos: "/productos", clientes: "/clientes", creditos: "/creditos", movimientos: "/movimientos", egresos: "/egresos", metricas: "/metricas" };
+const sectionRoutes: Record<string, string> = { dashboard: "/dashboard", comanda: "/comanda", productos: "/productos", clientes: "/clientes", creditos: "/creditos", movimientos: "/movimientos", egresos: "/egresos", ingresos: "/ingresar", donaciones: "/donaciones", metricas: "/metricas", arqueo: "/arqueo", balance: "/balance", temas: "/temas" };
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,6 +32,7 @@ export default function LoginPage() {
       }
       sessionStorage.setItem("coffee_gosen_access_token", result.access_token);
       sessionStorage.setItem("coffee_gosen_user", JSON.stringify(result.user));
+      window.dispatchEvent(new Event("coffee-gosen-auth"));
       const firstRoute = result.user.role === "ADMIN" ? "/dashboard" : sectionRoutes[result.user.permissions?.[0]] ?? "/login";
       router.push(firstRoute);
     } catch (submissionError) {

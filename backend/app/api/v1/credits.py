@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, aliased
 from app.core.permissions import require_section
 from app.db.session import get_db
 from app.models import Credit, Customer, Sale, SaleSupport, User
+from app.models import Credit, Customer, Product, Sale, SaleItem, SaleSupport, User
 from app.schemas.credits import CreditRow, CreditsResponse
 
 router = APIRouter(prefix="/credits", tags=["credits"])
@@ -46,9 +47,17 @@ def list_credits(
     ).all()
     sale_ids = [credit.sale_id for credit, *_ in rows]
     supports = database.scalars(select(SaleSupport).where(SaleSupport.sale_id.in_(sale_ids))).all() if sale_ids else []
+    item_rows = database.execute(
+        select(SaleItem.sale_id, Product.name, SaleItem.quantity)
+        .join(Product, Product.id == SaleItem.product_id)
+        .where(SaleItem.sale_id.in_(sale_ids))
+    ).all() if sale_ids else []
     support_urls: dict[int, list[str]] = {}
     for support in supports:
         support_urls.setdefault(support.sale_id, []).append(support.file_url)
+    products: dict[int, list[CreditProduct]] = {}
+    for sale_id, product_name, quantity in item_rows:
+        products.setdefault(sale_id, []).append(CreditProduct(name=product_name, quantity=quantity))
     return CreditsResponse(credits=[CreditRow(
         id=credit.id,
         sale_id=credit.sale_id,
@@ -60,5 +69,6 @@ def list_credits(
         pending_amount=credit.pending_amount,
         status=credit.status,
         created_at=credit.created_at,
+        products=products.get(credit.sale_id, []),
         support_urls=support_urls.get(credit.sale_id, []),
     ) for credit, sale_number, customer_name, seller_name, cashier_name in rows])

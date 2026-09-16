@@ -1,26 +1,445 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BarChart3, CircleDollarSign, Download, LineChart, TrendingDown, TrendingUp } from "lucide-react";
+import {
+  BarChart3,
+  CircleDollarSign,
+  Download,
+  LineChart,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
 import { downloadExcel } from "@/lib/excel";
 
 type Point = { label: string; value: number };
-type Metrics = { income_by_day: Point[]; expenses_by_day: Point[]; sales_by_day: Point[]; payment_methods: Point[]; expense_categories: Point[]; total_income: number; total_expenses: number; total_sales: number };
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "https://backend-lemon-five-80.vercel.app/api/v1" : "http://localhost:8001/api/v1");
-const money = (value: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(value);
+type Metrics = {
+  income_by_day: Point[];
+  expenses_by_day: Point[];
+  sales_by_day: Point[];
+  credits_by_day: Point[];
+  payment_methods: Point[];
+  expense_categories: Point[];
+  total_income: number;
+  total_expenses: number;
+  total_sales: number;
+};
+const apiUrl =
+  process.env.NEXT_PUBLIC_API_URL ??
+  (process.env.NODE_ENV === "production"
+    ? "https://backend-lemon-five-80.vercel.app/api/v1"
+    : "http://localhost:8001/api/v1");
+const money = (value: number) =>
+  new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    maximumFractionDigits: 0,
+  }).format(value);
 
-function ChartFrame({ title, chartType, description, icon: Icon, children }: { title: string; chartType: string; description: string; icon: typeof BarChart3; children: React.ReactNode }) { return <section className="border border-[var(--line)] bg-white p-5"><div className="mb-4 flex flex-wrap items-start justify-between gap-3"><div className="flex items-center gap-2"><Icon size={19} className="text-[var(--blue-main)]" /><div><h2 className="font-semibold">{title}</h2><p className="mt-1 text-xs text-[var(--muted)]">{description}</p></div></div><span className="border border-[var(--line)] px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--blue-main)]">{chartType}</span></div>{children}</section>; }
-function BarChart({ points, color, formatValue }: { points: Point[]; color: string; formatValue?: (value: number) => string }) { const visible = points.slice(-14); const max = Math.max(...visible.map((point) => Number(point.value)), 1); return visible.length ? <div className="flex h-56 items-end gap-1 border-b border-l border-[var(--line)] px-3 pb-2 pt-4 sm:gap-2">{visible.map((point) => <div key={point.label} className="group flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-2" title={`${point.label}: ${formatValue?.(Number(point.value)) ?? point.value}`}><div className="relative flex h-full w-full items-end"><span className="w-full rounded-t-sm transition-opacity group-hover:opacity-70" style={{ height: `${Math.max(4, Number(point.value) / max * 100)}%`, backgroundColor: color }} /></div><small className="max-w-full truncate text-[10px] text-[var(--muted)]">{point.label}</small></div>)}</div> : <div className="grid h-56 place-items-center border border-dashed border-[var(--line)] text-sm text-[var(--muted)]">Sin datos para este per&iacute;odo</div>; }
-function LineChartView({ points }: { points: Point[] }) { const visible = points.slice(-14); const max = Math.max(...visible.map((point) => Number(point.value)), 1); const width = 700; const height = 230; const left = 12; const bottom = 28; const top = 18; const chartHeight = height - top - bottom; const getX = (index: number) => visible.length < 2 ? width / 2 : left + index / (visible.length - 1) * (width - left * 2); const getY = (value: number) => top + chartHeight - Number(value) / max * chartHeight; const linePoints = visible.map((point, index) => `${getX(index)},${getY(Number(point.value))}`).join(" "); const areaPoints = visible.length ? `${getX(0)},${height - bottom} ${linePoints} ${getX(visible.length - 1)},${height - bottom}` : ""; return visible.length ? <div className="overflow-x-auto"><svg viewBox={`0 0 ${width} ${height}`} className="h-56 min-w-[620px] w-full" role="img" aria-label="Tendencia de ventas"><line x1={left} y1={top} x2={left} y2={height - bottom} stroke="#b7d7dc" /><line x1={left} y1={height - bottom} x2={width - left} y2={height - bottom} stroke="#b7d7dc" /><polygon points={areaPoints} fill="#4a8f64" opacity="0.12" /><polyline fill="none" stroke="#4a8f64" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round" points={linePoints} />{visible.map((point, index) => <g key={point.label}><circle cx={getX(index)} cy={getY(Number(point.value))} r="5" fill="#fff" stroke="#4a8f64" strokeWidth="3" /><text x={getX(index)} y={height - 8} textAnchor="middle" fontSize="10" fill="#4b6470">{point.label}</text></g>)}</svg></div> : <div className="grid h-56 place-items-center border border-dashed border-[var(--line)] text-sm text-[var(--muted)]">Sin datos para este per&iacute;odo</div>; }
-function DonutChart({ points }: { points: Point[] }) { const total = points.reduce((sum, point) => sum + Number(point.value), 0); const colors = ["#087ea4", "#e5a63d", "#d65a42", "#4a8f64", "#7657a6"]; const offsets = points.map((_, index) => points.slice(0, index).reduce((sum, point) => sum + (total ? Number(point.value) / total * 100 : 0), 0)); return <div className="flex flex-col items-center gap-6 sm:flex-row"><div className="relative size-44 shrink-0"><svg viewBox="0 0 42 42" className="size-full -rotate-90" role="img" aria-label="Distribuci&oacute;n de egresos por categor&iacute;a"><circle cx="21" cy="21" r="15.9" fill="none" stroke="#e7edf0" strokeWidth="8" />{points.map((point, index) => { const length = total ? Number(point.value) / total * 100 : 0; return <circle key={point.label} cx="21" cy="21" r="15.9" fill="none" stroke={colors[index % colors.length]} strokeWidth="8" strokeDasharray={`${length} ${100 - length}`} strokeDashoffset={-offsets[index]} />; })}</svg><div className="absolute inset-0 grid place-items-center text-center"><strong className="text-lg">{money(total)}</strong><span className="block text-[10px] text-[var(--muted)]">Total</span></div></div>{points.length ? <div className="space-y-2 text-sm">{points.map((point, index) => <p key={point.label} className="flex items-center gap-2"><span className="size-3 shrink-0" style={{ backgroundColor: colors[index % colors.length] }} />{point.label}<strong className="ml-auto pl-4">{money(Number(point.value))}</strong></p>)}</div> : <p className="text-sm text-[var(--muted)]">Sin categorías en este período.</p>}</div>; }
+function ChartFrame({
+  title,
+  chartType,
+  description,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  chartType: string;
+  description: string;
+  icon: typeof BarChart3;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="border border-[var(--line)] bg-white p-5">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Icon size={19} className="text-[var(--blue-main)]" />
+          <div>
+            <h2 className="font-semibold">{title}</h2>
+            <p className="mt-1 text-xs text-[var(--muted)]">{description}</p>
+          </div>
+        </div>
+        <span className="border border-[var(--line)] px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--blue-main)]">
+          {chartType}
+        </span>
+      </div>
+      {children}
+    </section>
+  );
+}
+function BarChart({
+  points,
+  color,
+  formatValue,
+}: {
+  points: Point[];
+  color: string;
+  formatValue?: (value: number) => string;
+}) {
+  const visible = points.slice(-14);
+  const max = Math.max(...visible.map((point) => Number(point.value)), 1);
+  return visible.length ? (
+    <div className="flex h-56 items-end gap-1 border-b border-l border-[var(--line)] px-3 pb-2 pt-4 sm:gap-2">
+      {visible.map((point) => (
+        <div
+          key={point.label}
+          className="group flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-2"
+          title={`${point.label}: ${formatValue?.(Number(point.value)) ?? point.value}`}
+        >
+          <div className="relative flex h-full w-full items-end">
+            <span
+              className="w-full rounded-t-sm transition-opacity group-hover:opacity-70"
+              style={{
+                height: `${Math.max(4, (Number(point.value) / max) * 100)}%`,
+                backgroundColor: color,
+              }}
+            />
+          </div>
+          <small className="max-w-full truncate text-[10px] text-[var(--muted)]">
+            {point.label}
+          </small>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <div className="grid h-56 place-items-center border border-dashed border-[var(--line)] text-sm text-[var(--muted)]">
+      Sin datos para este per&iacute;odo
+    </div>
+  );
+}
+function LineChartView({ points }: { points: Point[] }) {
+  const visible = points.slice(-14);
+  const max = Math.max(...visible.map((point) => Number(point.value)), 1);
+  const width = 700;
+  const height = 230;
+  const left = 12;
+  const bottom = 28;
+  const top = 18;
+  const chartHeight = height - top - bottom;
+  const getX = (index: number) =>
+    visible.length < 2
+      ? width / 2
+      : left + (index / (visible.length - 1)) * (width - left * 2);
+  const getY = (value: number) =>
+    top + chartHeight - (Number(value) / max) * chartHeight;
+  const linePoints = visible
+    .map((point, index) => `${getX(index)},${getY(Number(point.value))}`)
+    .join(" ");
+  const areaPoints = visible.length
+    ? `${getX(0)},${height - bottom} ${linePoints} ${getX(visible.length - 1)},${height - bottom}`
+    : "";
+  return visible.length ? (
+    <div className="overflow-x-auto">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="h-56 min-w-[620px] w-full"
+        role="img"
+        aria-label="Tendencia de ventas"
+      >
+        <line
+          x1={left}
+          y1={top}
+          x2={left}
+          y2={height - bottom}
+          stroke="#b7d7dc"
+        />
+        <line
+          x1={left}
+          y1={height - bottom}
+          x2={width - left}
+          y2={height - bottom}
+          stroke="#b7d7dc"
+        />
+        <polygon points={areaPoints} fill="#4a8f64" opacity="0.12" />
+        <polyline
+          fill="none"
+          stroke="#4a8f64"
+          strokeWidth="4"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          points={linePoints}
+        />
+        {visible.map((point, index) => (
+          <g key={point.label}>
+            <circle
+              cx={getX(index)}
+              cy={getY(Number(point.value))}
+              r="5"
+              fill="#fff"
+              stroke="#4a8f64"
+              strokeWidth="3"
+            />
+            <text
+              x={getX(index)}
+              y={height - 8}
+              textAnchor="middle"
+              fontSize="10"
+              fill="#4b6470"
+            >
+              {point.label}
+            </text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  ) : (
+    <div className="grid h-56 place-items-center border border-dashed border-[var(--line)] text-sm text-[var(--muted)]">
+      Sin datos para este per&iacute;odo
+    </div>
+  );
+}
+function DonutChart({ points }: { points: Point[] }) {
+  const total = points.reduce((sum, point) => sum + Number(point.value), 0);
+  const colors = ["#087ea4", "#e5a63d", "#d65a42", "#4a8f64", "#7657a6"];
+  const offsets = points.map((_, index) =>
+    points
+      .slice(0, index)
+      .reduce(
+        (sum, point) => sum + (total ? (Number(point.value) / total) * 100 : 0),
+        0,
+      ),
+  );
+  return (
+    <div className="flex flex-col items-center gap-6 sm:flex-row">
+      <div className="relative size-44 shrink-0">
+        <svg
+          viewBox="0 0 42 42"
+          className="size-full -rotate-90"
+          role="img"
+          aria-label="Distribuci&oacute;n de egresos por categor&iacute;a"
+        >
+          <circle
+            cx="21"
+            cy="21"
+            r="15.9"
+            fill="none"
+            stroke="#e7edf0"
+            strokeWidth="8"
+          />
+          {points.map((point, index) => {
+            const length = total ? (Number(point.value) / total) * 100 : 0;
+            return (
+              <circle
+                key={point.label}
+                cx="21"
+                cy="21"
+                r="15.9"
+                fill="none"
+                stroke={colors[index % colors.length]}
+                strokeWidth="8"
+                strokeDasharray={`${length} ${100 - length}`}
+                strokeDashoffset={-offsets[index]}
+              />
+            );
+          })}
+        </svg>
+        <div className="absolute inset-0 grid place-items-center text-center">
+          <strong className="text-lg">{money(total)}</strong>
+          <span className="block text-[10px] text-[var(--muted)]">Total</span>
+        </div>
+      </div>
+      {points.length ? (
+        <div className="space-y-2 text-sm">
+          {points.map((point, index) => (
+            <p key={point.label} className="flex items-center gap-2">
+              <span
+                className="size-3 shrink-0"
+                style={{ backgroundColor: colors[index % colors.length] }}
+              />
+              {point.label}
+              <strong className="ml-auto pl-4">
+                {money(Number(point.value))}
+              </strong>
+            </p>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-[var(--muted)]">
+          Sin categorías en este período.
+        </p>
+      )}
+    </div>
+  );
+}
 
 export default function MetricsPage() {
   const [data, setData] = useState<Metrics | null>(null);
   const [error, setError] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  function exportMetrics() { if (!data) return; downloadExcel([...data.income_by_day.map((point) => ({ Tipo: "Ingresos por día", Fecha: point.label, Valor: point.value })), ...data.expenses_by_day.map((point) => ({ Tipo: "Egresos por día", Fecha: point.label, Valor: point.value })), ...data.sales_by_day.map((point) => ({ Tipo: "Ventas por día", Fecha: point.label, Valor: point.value })), ...data.expense_categories.map((point) => ({ Tipo: "Egresos por categoría", Fecha: point.label, Valor: point.value }))], "metricas.xlsx", "Métricas"); }
-  useEffect(() => { const token = sessionStorage.getItem("coffee_gosen_access_token"); const params = new URLSearchParams(); if (dateFrom) params.set("date_from", dateFrom); if (dateTo) params.set("date_to", dateTo); fetch(`${apiUrl}/metrics${params.toString() ? `?${params.toString()}` : ""}`, { headers: token ? { Authorization: `Bearer ${token}` } : undefined }).then(async (response) => { const result = await response.json(); if (!response.ok) throw new Error(result.detail ?? "No fue posible cargar las m&eacute;tricas."); return result as Metrics; }).then(setData).catch((requestError: Error) => setError(requestError.message)); }, [dateFrom, dateTo]);
-  return <AdminPage title="M&eacute;tricas" description="Observa ingresos, egresos y ventas para tomar decisiones con datos."><button type="button" disabled={!data} onClick={exportMetrics} className="mb-4 inline-flex min-h-10 items-center gap-2 border border-[var(--line)] bg-white px-4 text-sm font-semibold text-[var(--blue-main)] disabled:opacity-50"><Download size={16} /> Descargar Excel</button>{error && <p role="alert" className="mb-6 border border-red-200 bg-red-50 p-5 text-sm text-red-700">{error}</p>}<div className="mb-6 flex flex-wrap items-end gap-3 border border-[var(--line)] bg-white p-5"><label className="text-xs font-semibold">Desde<input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="mt-1 block min-h-10 border border-[var(--line)] px-3 text-sm font-normal" /></label><label className="text-xs font-semibold">Hasta<input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="mt-1 block min-h-10 border border-[var(--line)] px-3 text-sm font-normal" /></label></div>{data && <><div className="mb-6 grid gap-px border border-[var(--line)] bg-[var(--line)] sm:grid-cols-3"><article className="bg-white p-5"><p className="text-sm text-[var(--muted)]">Ingresos</p><strong className="mt-2 block text-2xl text-emerald-700">{money(Number(data.total_income))}</strong></article><article className="bg-white p-5"><p className="text-sm text-[var(--muted)]">Egresos</p><strong className="mt-2 block text-2xl text-red-700">{money(Number(data.total_expenses))}</strong></article><article className="bg-white p-5"><p className="text-sm text-[var(--muted)]">Ventas</p><strong className="mt-2 block text-2xl">{data.total_sales}</strong></article></div><div className="grid gap-6 lg:grid-cols-2"><ChartFrame title="Ingresos por d&iacute;a" chartType="Barras" description="Total recibido en cada d&iacute;a." icon={TrendingUp}><BarChart points={data.income_by_day} color="#087ea4" formatValue={money} /></ChartFrame><ChartFrame title="Ventas por d&iacute;a" chartType="&Aacute;rea" description="Cantidad de ventas a lo largo del tiempo." icon={LineChart}><LineChartView points={data.sales_by_day} /></ChartFrame><ChartFrame title="Egresos por d&iacute;a" chartType="Barras" description="Gasto total registrado cada d&iacute;a." icon={TrendingDown}><BarChart points={data.expenses_by_day} color="#d65a42" formatValue={money} /></ChartFrame><ChartFrame title="Egresos por categor&iacute;a" chartType="Dona" description="Distribuci&oacute;n del gasto por categor&iacute;a." icon={CircleDollarSign}><DonutChart points={data.expense_categories} /></ChartFrame></div></>}</AdminPage>;
+  function exportMetrics() {
+    if (!data) return;
+    downloadExcel(
+      [
+        ...data.income_by_day.map((point) => ({
+          Tipo: "Ingresos por día",
+          Fecha: point.label,
+          Valor: point.value,
+        })),
+        ...data.expenses_by_day.map((point) => ({
+          Tipo: "Egresos por día",
+          Fecha: point.label,
+          Valor: point.value,
+        })),
+        ...data.sales_by_day.map((point) => ({
+          Tipo: "Ventas por día",
+          Fecha: point.label,
+          Valor: point.value,
+        })),
+        ...data.credits_by_day.map((point) => ({
+          Tipo: "Créditos por día",
+          Fecha: point.label,
+          Valor: point.value,
+        })),
+        ...data.expense_categories.map((point) => ({
+          Tipo: "Egresos por categoría",
+          Fecha: point.label,
+          Valor: point.value,
+        })),
+      ],
+      "metricas.xlsx",
+      "Métricas",
+    );
+  }
+  useEffect(() => {
+    const token = sessionStorage.getItem("coffee_gosen_access_token");
+    const params = new URLSearchParams();
+    if (dateFrom) params.set("date_from", dateFrom);
+    if (dateTo) params.set("date_to", dateTo);
+    fetch(
+      `${apiUrl}/metrics${params.toString() ? `?${params.toString()}` : ""}`,
+      { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
+    )
+      .then(async (response) => {
+        const result = await response.json();
+        if (!response.ok)
+          throw new Error(
+            result.detail ?? "No fue posible cargar las m&eacute;tricas.",
+          );
+        return result as Metrics;
+      })
+      .then(setData)
+      .catch((requestError: Error) => setError(requestError.message));
+  }, [dateFrom, dateTo]);
+  return (
+    <AdminPage
+      title="M&eacute;tricas"
+      description="Observa ingresos, egresos y ventas para tomar decisiones con datos."
+    >
+      <button
+        type="button"
+        disabled={!data}
+        onClick={exportMetrics}
+        className="mb-4 inline-flex min-h-10 items-center gap-2 border border-[var(--line)] bg-white px-4 text-sm font-semibold text-[var(--blue-main)] disabled:opacity-50"
+      >
+        <Download size={16} /> Descargar Excel
+      </button>
+      {error && (
+        <p
+          role="alert"
+          className="mb-6 border border-red-200 bg-red-50 p-5 text-sm text-red-700"
+        >
+          {error}
+        </p>
+      )}
+      <div className="mb-6 flex flex-wrap items-end gap-3 border border-[var(--line)] bg-white p-5">
+        <label className="text-xs font-semibold">
+          Desde
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(event) => setDateFrom(event.target.value)}
+            className="mt-1 block min-h-10 border border-[var(--line)] px-3 text-sm font-normal"
+          />
+        </label>
+        <label className="text-xs font-semibold">
+          Hasta
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(event) => setDateTo(event.target.value)}
+            className="mt-1 block min-h-10 border border-[var(--line)] px-3 text-sm font-normal"
+          />
+        </label>
+      </div>
+      {data && (
+        <>
+          <div className="mb-6 grid gap-px border border-[var(--line)] bg-[var(--line)] sm:grid-cols-3">
+            <article className="bg-white p-5">
+              <p className="text-sm text-[var(--muted)]">Ingresos</p>
+              <strong className="mt-2 block text-2xl text-emerald-700">
+                {money(Number(data.total_income))}
+              </strong>
+            </article>
+            <article className="bg-white p-5">
+              <p className="text-sm text-[var(--muted)]">Egresos</p>
+              <strong className="mt-2 block text-2xl text-red-700">
+                {money(Number(data.total_expenses))}
+              </strong>
+            </article>
+            <article className="bg-white p-5">
+              <p className="text-sm text-[var(--muted)]">Ventas</p>
+              <strong className="mt-2 block text-2xl">
+                {data.total_sales}
+              </strong>
+            </article>
+          </div>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <ChartFrame
+              title="Ingresos por d&iacute;a"
+              chartType="Barras"
+              description="Total recibido en cada d&iacute;a."
+              icon={TrendingUp}
+            >
+              <BarChart
+                points={data.income_by_day}
+                color="#087ea4"
+                formatValue={money}
+              />
+            </ChartFrame>
+            <ChartFrame
+              title="Ventas por d&iacute;a"
+              chartType="&Aacute;rea"
+              description="Cantidad de ventas a lo largo del tiempo."
+              icon={LineChart}
+            >
+              <LineChartView points={data.sales_by_day} />
+            </ChartFrame>
+            <ChartFrame
+              title="Cr&eacute;ditos por d&iacute;a"
+              chartType="Barras"
+              description="Valor total de cr&eacute;ditos creados cada d&iacute;a."
+              icon={CircleDollarSign}
+            >
+              <BarChart
+                points={data.credits_by_day}
+                color="#7657a6"
+                formatValue={money}
+              />
+            </ChartFrame>
+            <ChartFrame
+              title="Egresos por d&iacute;a"
+              chartType="Barras"
+              description="Gasto total registrado cada d&iacute;a."
+              icon={TrendingDown}
+            >
+              <BarChart
+                points={data.expenses_by_day}
+                color="#d65a42"
+                formatValue={money}
+              />
+            </ChartFrame>
+            <ChartFrame
+              title="Egresos por categor&iacute;a"
+              chartType="Dona"
+              description="Distribuci&oacute;n del gasto por categor&iacute;a."
+              icon={CircleDollarSign}
+            >
+              <DonutChart points={data.expense_categories} />
+            </ChartFrame>
+          </div>
+        </>
+      )}
+    </AdminPage>
+  );
 }

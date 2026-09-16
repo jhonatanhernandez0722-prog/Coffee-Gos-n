@@ -45,7 +45,7 @@ def available_sellers(database: Session = Depends(get_db), _: User = Depends(get
 @router.post("", response_model=SellerResponse, status_code=status.HTTP_201_CREATED)
 def create_seller(payload: SellerCreate, database: Session = Depends(get_db), _: User = Depends(require_admin)) -> SellerResponse:
     validate_permissions(payload.permissions)
-    seller = User(full_name=payload.full_name.strip(), email=payload.email, password_hash=hash_password(payload.pin), role="SELLER", is_active=True)
+    seller = User(full_name=payload.full_name.strip(), email=payload.email, password_hash=hash_password(payload.pin), role=payload.role, is_active=True)
     database.add(seller)
     try:
         database.flush()

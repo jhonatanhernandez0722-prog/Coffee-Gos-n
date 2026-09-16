@@ -12,6 +12,7 @@ from app.db.session import Base
 class UserRole(StrEnum):
     ADMIN = "ADMIN"
     SELLER = "SELLER"
+    VIEWER = "VIEWER"
 
 
 class PaymentMethod(StrEnum):
@@ -28,6 +29,11 @@ class InventoryMovementType(StrEnum):
 
 
 class CreditStatus(StrEnum):
+    PENDING = "PENDING"
+    PAID = "PAID"
+
+
+class LiabilityStatus(StrEnum):
     PENDING = "PENDING"
     PAID = "PAID"
 
@@ -169,6 +175,11 @@ class FinancialMovement(Base):
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     concept: Mapped[str] = mapped_column(String(180))
     payment_method: Mapped[Optional[str]] = mapped_column(String(20))
+    person_name: Mapped[Optional[str]] = mapped_column(String(120))
+    product: Mapped[Optional[str]] = mapped_column(String(180))
+    settled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), index=True)
+    income_type: Mapped[Optional[str]] = mapped_column(String(30), index=True)
+    occurred_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), index=True)
     expense_category_id: Mapped[Optional[int]] = mapped_column(ForeignKey("expense_categories.id"), index=True)
     sale_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sales.id"))
     observation: Mapped[Optional[str]] = mapped_column(Text())
@@ -195,3 +206,16 @@ class Credit(Base):
     status: Mapped[str] = mapped_column(String(20), default=CreditStatus.PENDING.value, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     paid_at: Mapped[Optional[date]] = mapped_column(Date())
+
+
+class Liability(Base):
+    __tablename__ = "liabilities"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(40), index=True)
+    description: Mapped[str] = mapped_column(String(240))
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    due_date: Mapped[Optional[date]] = mapped_column(Date())
+    status: Mapped[str] = mapped_column(String(20), default=LiabilityStatus.PENDING.value, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))

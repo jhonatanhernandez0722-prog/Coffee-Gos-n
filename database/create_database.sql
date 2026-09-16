@@ -105,6 +105,12 @@ CREATE TABLE IF NOT EXISTS financial_movements (
     amount          NUMERIC(12, 2) NOT NULL CHECK (amount > 0),
     concept         VARCHAR(180) NOT NULL,
     sale_id         BIGINT REFERENCES sales(id),
+    payment_method  VARCHAR(20),
+    person_name     VARCHAR(120),
+    product         VARCHAR(180),
+    settled_at      TIMESTAMPTZ,
+    income_type     VARCHAR(30),
+    occurred_at     TIMESTAMPTZ,
     observation     TEXT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -122,6 +128,17 @@ CREATE TABLE IF NOT EXISTS credits (
     CHECK (pending_amount <= original_amount),
     CHECK ((status = 'PENDING' AND paid_at IS NULL)
         OR (status = 'PAID' AND pending_amount = 0 AND paid_at IS NOT NULL))
+);
+
+CREATE TABLE IF NOT EXISTS liabilities (
+    id              BIGSERIAL PRIMARY KEY,
+    kind            VARCHAR(40) NOT NULL,
+    description     VARCHAR(240) NOT NULL,
+    amount          NUMERIC(12, 2) NOT NULL CHECK (amount > 0),
+    due_date        DATE,
+    status          VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    paid_at         TIMESTAMPTZ
 );
 
 CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);
