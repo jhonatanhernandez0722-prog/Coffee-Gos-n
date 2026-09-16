@@ -770,10 +770,10 @@ export default function ProductsPage() {
           <article key={product.id} className="border border-[var(--line)] bg-white p-4 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
-                {product.image_url ? (
+                {imageUrl(product.image_url) ? (
                   <Image
-                    src={imageUrl(product.image_url)}
-                    alt=""
+                    src={imageUrl(product.image_url) as string}
+                    alt={product.name}
                     width={52}
                     height={52}
                     unoptimized
