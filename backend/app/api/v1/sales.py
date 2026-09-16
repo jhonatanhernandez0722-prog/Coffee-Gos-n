@@ -130,8 +130,6 @@ async def save_sale_supports(sale_id: int, files: list[UploadFile], database: Se
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sale not found")
     if len(files) > 5:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Puedes adjuntar máximo 5 imágenes")
-    supports_directory = media_directory / "sales" / str(sale_id)
-    supports_directory.mkdir(parents=True, exist_ok=True)
     urls: list[str] = []
     for file in files:
         if file.content_type not in {"image/png", "image/jpeg", "image/webp"}:
@@ -146,6 +144,8 @@ async def save_sale_supports(sale_id: int, files: list[UploadFile], database: Se
         except (httpx.HTTPError, KeyError, ValueError) as error:
             raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="No fue posible subir el soporte a ImageKit") from error
         if url is None:
+            supports_directory = media_directory / "sales" / str(sale_id)
+            supports_directory.mkdir(parents=True, exist_ok=True)
             (supports_directory / filename).write_bytes(content)
             url = f"/media/sales/{sale_id}/{filename}"
         database.add(SaleSupport(sale_id=sale_id, file_url=url, file_name=file.filename or filename))

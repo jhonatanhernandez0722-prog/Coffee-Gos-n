@@ -93,7 +93,9 @@ export default function ComandaPage() {
       setReceipt(saleResult); setCart([]); setBuyerName(""); setCustomerId(null); setAssignedSellerId(null); setPaymentMethod("CASH"); setSupportFiles([]);
       const productsResponse = await fetch(`${apiUrl}/products?saleable_only=true`, { headers: token ? { Authorization: `Bearer ${token}` } : undefined });
       if (productsResponse.ok) setProducts(await productsResponse.json() as Product[]);
-    } catch (requestError) { setError(requestError instanceof Error ? requestError.message : "No fue posible confirmar la venta."); } finally { setSaving(false); }
+    } catch (requestError) {
+      setError(requestError instanceof TypeError && requestError.message.toLowerCase().includes("fetch") ? `No se pudo conectar con el backend (${apiUrl}). Verifica el deployment de la API.` : requestError instanceof Error ? requestError.message : "No fue posible confirmar la venta.");
+    } finally { setSaving(false); }
   }
 
   function exportReceipt() { if (!receipt) return; downloadExcel(receipt.items.map((item) => ({ Venta: receipt.sale_number, Fecha: receipt.created_at, Comprador: receipt.customer_name ?? "Venta general", Pago: paymentLabel[receipt.payment_method], Producto: item.name, Cantidad: item.quantity, "Precio unitario": item.unit_price, Total: item.line_total })), `venta-${receipt.sale_number}.xlsx`, "Venta"); }
