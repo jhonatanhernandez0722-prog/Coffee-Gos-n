@@ -33,6 +33,11 @@ export function AdminPage({ title, description, children }: { title: string; des
   const [accessChecked, setAccessChecked] = useState(false);
   const [homeRoute, setHomeRoute] = useState("/dashboard");
   const [currentUser, setCurrentUser] = useState<{ role?: string; permissions?: string[] } | null>(null);
+  const isAdminUser = currentUser?.role === "ADMIN";
+  const visibleNavigation = navigation.filter((item) => {
+    if (!currentUser || isAdminUser) return true;
+    return (currentUser.permissions ?? []).includes(item.key);
+  });
 
   useEffect(() => {
     const loadCurrentUser = async () => {
@@ -119,7 +124,7 @@ export function AdminPage({ title, description, children }: { title: string; des
           <ChevronDown aria-hidden="true" size={19} className="text-[var(--muted)] transition-transform group-open:rotate-180" />
         </summary>
         <nav className="mt-2 grid gap-1 border border-[var(--line)] bg-[var(--canvas)] p-2 sm:grid-cols-2 lg:grid-cols-3" aria-label="Navegación de secciones">
-          {navigation.filter((item) => currentUser?.role === "ADMIN" || currentUser?.permissions?.includes(item.key)).map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`flex min-h-12 items-center gap-3 px-3 text-sm font-semibold ${pathname === href ? "bg-[var(--blue-light)] text-[var(--blue-main)]" : "text-[var(--muted)] hover:bg-white hover:text-[var(--ink)]"}`}><Icon size={17} />{label}</Link>)}
+          {visibleNavigation.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`flex min-h-12 items-center gap-3 px-3 text-sm font-semibold ${pathname === href ? "bg-[var(--blue-light)] text-[var(--blue-main)]" : "text-[var(--muted)] hover:bg-white hover:text-[var(--ink)]"}`}><Icon size={17} />{label}</Link>)}
         </nav>
       </details>
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10"><p className="text-sm text-[var(--muted)]">Operación</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">{title}</h1><p className="mt-3 max-w-2xl text-[var(--muted)]">{description}</p><div className="mt-8">{children}</div></section>
