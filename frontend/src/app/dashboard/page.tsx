@@ -526,6 +526,13 @@ export default function DashboardPage() {
             </Link>
           </div>
         </header>
+        <div className="border-b border-[var(--line)] bg-white px-6 py-3 lg:hidden">
+          <label className="block text-xs font-semibold text-[var(--muted)]" htmlFor="dashboard-navigation">Ir a sección
+            <select id="dashboard-navigation" value="/dashboard" onChange={(event) => router.push(event.target.value)} className="mt-2 min-h-11 w-full border border-[var(--line)] bg-white px-3 text-sm font-semibold text-[var(--ink)] focus:border-[var(--blue-main)]">
+              {navigation.filter(({ adminOnly, permission }) => isAdmin || (!adminOnly && currentUser?.permissions?.includes(permission))).map(({ label, href }) => <option key={href} value={href}>{label}</option>)}
+            </select>
+          </label>
+        </div>
         <div className="p-6 lg:p-10">
           {isLoading && (
             <div className="border border-[var(--line)] bg-white p-8 text-sm text-[var(--muted)]">

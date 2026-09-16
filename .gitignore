@@ -27,3 +27,5 @@ frontend/.git-frontend-history/
 
 # Keep source media, ignore generated caches
 backend/storage/**/.DS_Store
+.vercel
+.env*.local

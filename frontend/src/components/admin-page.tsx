@@ -22,12 +22,14 @@ const accessByRoute: Record<string, { key: string; label: string; href: string }
   "/balance": { key: "balance", label: "Balance General", href: "/balance" },
   "/temas": { key: "temas", label: "Temas", href: "/temas" },
 };
+const navigation = Object.values(accessByRoute).filter((item) => item.key !== "admin");
 
 export function AdminPage({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [accessChecked, setAccessChecked] = useState(false);
   const [homeRoute, setHomeRoute] = useState("/dashboard");
+  const [currentUser, setCurrentUser] = useState<{ role?: string; permissions?: string[] } | null>(null);
 
   useEffect(() => {
     const loadCurrentUser = async () => {
@@ -40,6 +42,7 @@ export function AdminPage({ title, description, children }: { title: string; des
       }
 
       let user = JSON.parse(storedUser) as { role?: string; permissions?: string[] };
+      setCurrentUser(user);
       const token = sessionStorage.getItem("coffee_gosen_access_token");
 
       if (!token) {
@@ -69,6 +72,7 @@ export function AdminPage({ title, description, children }: { title: string; des
 
         if (response.ok) {
           user = await response.json() as { role?: string; permissions?: string[] };
+          setCurrentUser(user);
           sessionStorage.setItem("coffee_gosen_user", JSON.stringify(user));
         }
       } catch {
@@ -106,6 +110,13 @@ export function AdminPage({ title, description, children }: { title: string; des
           <Link href={homeRoute} className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[var(--muted)] hover:text-[var(--blue-main)]"><ArrowLeft size={16} /> Volver</Link>
         </div>
       </header>
+      <div className="border-b border-[var(--line)] bg-white px-6 py-3 lg:hidden">
+        <label className="block text-xs font-semibold text-[var(--muted)]" htmlFor="tablet-navigation">Ir a sección
+          <select id="tablet-navigation" value={pathname} onChange={(event) => router.push(event.target.value)} className="mt-2 min-h-11 w-full border border-[var(--line)] bg-white px-3 text-sm font-semibold text-[var(--ink)] focus:border-[var(--blue-main)]">
+            {navigation.filter((item) => currentUser?.role === "ADMIN" || currentUser?.permissions?.includes(item.key)).map((item) => <option key={item.href} value={item.href}>{item.label}</option>)}
+          </select>
+        </label>
+      </div>
       <section className="mx-auto max-w-7xl px-6 py-10 lg:px-10"><p className="text-sm text-[var(--muted)]">Operación</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">{title}</h1><p className="mt-3 max-w-2xl text-[var(--muted)]">{description}</p><div className="mt-8">{children}</div></section>
     </main>
   );
