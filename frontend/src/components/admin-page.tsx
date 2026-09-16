@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowLeft, BarChart3, CircleDollarSign, Coffee, CreditCard, HandCoins, LayoutDashboard, Package, Palette, QrCode, ReceiptText, Scale, ShoppingBag, UserRound, Users, WalletCards } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { apiUrl } from "@/lib/api";
 
 type RouteItem = { key: string; label: string; href: string; icon: LucideIcon };
 const accessByRoute: Record<string, RouteItem> = {
@@ -57,7 +58,7 @@ export function AdminPage({ title, description, children }: { title: string; des
         const controller = new AbortController();
         const timeoutId = window.setTimeout(() => controller.abort(), 8000);
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "https://backend-lemon-five-80.vercel.app/api/v1" : "http://localhost:8001/api/v1")}/auth/me`, {
+        const response = await fetch(`${apiUrl}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
           signal: controller.signal,
         });

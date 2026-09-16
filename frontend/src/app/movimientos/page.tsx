@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import { ArrowDownUp, Download } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
+import { apiUrl } from "@/lib/api";
 
 type Movement = { id: number; domain: "inventory" | "financial"; related_id: number | null; movement_type: string; amount: number | null; quantity: number | null; concept: string; product_name: string | null; created_at: string };
 type MovementGroup = { key: string; created_at: string; inventory: string[]; financial: string[] };
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001/api/v1";
 const money = (value: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(value);
 const quantityLabel = (value: number | null) => value === null ? "-" : Number.isInteger(Number(value)) ? String(Number(value)) : String(value);
 const labels: Record<string, string> = { SALE: "Salida por venta", PURCHASE: "Entrada de inventario", ADJUSTMENT: "Ajuste de inventario", INTERNAL_USE: "Uso interno", INCOME: "Ingreso", EXPENSE: "Egreso" };
