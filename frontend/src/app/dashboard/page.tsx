@@ -92,24 +92,6 @@ const apiUrl =
   (process.env.NODE_ENV === "production"
     ? "https://backend-lemon-five-80.vercel.app/api/v1"
     : "http://localhost:8001/api/v1");
-const menuEmojis: Record<string, string> = {
-  Resumen: "📊",
-  Ventas: "🧾",
-  Productos: "📦",
-  Clientes: "👥",
-  Créditos: "💳",
-  Movimientos: "📜",
-  Vendedores: "👤",
-  "Egresos y costo": "💸",
-  Ingresar: "💰",
-  Donaciones: "🤝",
-  "QR de pago": "📱",
-  Métricas: "📈",
-  "Arqueo de Caja": "🧮",
-  "Balance General": "⚖️",
-  Temas: "🎨",
-};
-
 const navigation = [
   {
     label: "Resumen",
@@ -511,7 +493,7 @@ export default function DashboardPage() {
                 )}
               </button>
               {alertsOpen && (
-                <div className="absolute right-0 z-10 mt-2 w-[min(22rem,calc(100vw-3rem))] border border-[var(--line)] bg-white shadow-xl">
+                <div className="absolute left-1/2 z-10 mt-2 w-[min(22rem,calc(100vw-3rem))] -translate-x-1/2 border border-[var(--line)] bg-white shadow-xl">
                   <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
                     <strong className="text-sm">Alertas</strong>
                     <span className="text-xs text-[var(--muted)]">
@@ -562,13 +544,13 @@ export default function DashboardPage() {
                 onClick={() => setMenuOpen((prev) => !prev)}
                 className="flex items-center justify-center rounded-xl border border-[var(--line)] bg-white p-2 text-[var(--ink)] shadow-sm transition hover:border-[var(--blue-main)] hover:text-[var(--blue-main)]"
               >
-                <span className="grid size-8 place-items-center rounded-lg bg-[var(--blue-light)] text-lg text-[var(--blue-main)]">
-                  ☰
+                <span className="grid size-8 place-items-center rounded-lg bg-[var(--blue-light)] text-[var(--blue-main)]">
+                  <Menu size={16} />
                 </span>
               </button>
 
               {menuOpen && (
-                <div className="absolute right-0 z-20 mt-2 w-[min(18rem,calc(100vw-2.5rem))] rounded-2xl border border-[var(--line)] bg-white p-2 shadow-xl">
+                <div className="absolute left-1/2 z-20 mt-2 w-[min(18rem,calc(100vw-1.5rem))] -translate-x-1/2 rounded-2xl border border-[var(--line)] bg-white p-2 shadow-xl">
                   <div className="mb-2 flex items-center justify-between px-2 py-1">
                     <strong className="text-sm text-[var(--ink)]">Navegación</strong>
                     <button type="button" onClick={() => setMenuOpen(false)} className="text-xs text-[var(--muted)]">Cerrar</button>
@@ -583,8 +565,8 @@ export default function DashboardPage() {
                           onClick={() => setMenuOpen(false)}
                           className={`flex items-center gap-2 rounded-xl px-2 py-2 text-[11px] font-semibold ${href === "/dashboard" ? "bg-[var(--blue-light)] text-[var(--blue-main)]" : "text-[var(--muted)] hover:bg-[var(--canvas)] hover:text-[var(--ink)]"}`}
                         >
-                          <span className="grid size-6 place-items-center rounded-md bg-white text-[var(--blue-main)] text-[12px]">
-                            {menuEmojis[label] ?? "•"}
+                          <span className="grid size-6 place-items-center rounded-md bg-[var(--blue-light)] text-[var(--blue-main)]">
+                            <Icon size={12} />
                           </span>
                           <span className="truncate">{label}</span>
                         </Link>
