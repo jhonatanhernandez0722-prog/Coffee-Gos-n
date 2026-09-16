@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.api.v1.dependencies import require_admin
 from app.core.permissions import require_section
 from app.db.session import get_db
 from app.models import FinancialMovement, User
@@ -73,7 +74,7 @@ def create_income(payload: IncomeCreate, database: Session = Depends(get_db), cu
 
 
 @router.patch("/{income_id}", response_model=IncomeResponse)
-def update_income(income_id: int, payload: IncomeCreate, database: Session = Depends(get_db), _: User = Depends(require_section("ingresos"))) -> IncomeResponse:
+def update_income(income_id: int, payload: IncomeCreate, database: Session = Depends(get_db), _: User = Depends(require_admin)) -> IncomeResponse:
     movement = database.scalar(independent_statement().where(FinancialMovement.id == income_id))
     if movement is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ingreso no encontrado")
@@ -90,7 +91,7 @@ def update_income(income_id: int, payload: IncomeCreate, database: Session = Dep
 
 
 @router.delete("/{income_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_income(income_id: int, database: Session = Depends(get_db), _: User = Depends(require_section("ingresos"))) -> None:
+def delete_income(income_id: int, database: Session = Depends(get_db), _: User = Depends(require_admin)) -> None:
     movement = database.scalar(independent_statement().where(FinancialMovement.id == income_id))
     if movement is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ingreso no encontrado")

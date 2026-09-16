@@ -7,26 +7,48 @@ from sqlalchemy.orm import Session, aliased
 from app.core.permissions import require_section
 from app.db.session import get_db
 from app.models import Credit, Customer, Product, Sale, SaleItem, SaleSupport, User
-from app.schemas.credits import CreditProduct, CreditRow, CreditsResponse
+from app.schemas.credits import CreditPaymentCreate, CreditProduct, CreditRow, CreditsResponse
 
 router = APIRouter(prefix="/credits", tags=["credits"])
+
+
+def register_credit_payment(credit_id: int, payload: CreditPaymentCreate, database: Session, current_user: User) -> CreditRow:
+    credit = database.scalar(select(Credit).where(Credit.id == credit_id).with_for_update())
+    if credit is None or credit.status != "PENDING":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Crédito pendiente no encontrado")
+    if payload.amount > credit.pending_amount:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El pago no puede superar el saldo pendiente")
+    sale = database.get(Sale, credit.sale_id)
+    if sale is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Venta asociada no encontrada")
+    credit.pending_amount -= payload.amount
+    if credit.pending_amount == 0:
+        credit.status = "PAID"
+        credit.paid_at = datetime.now(timezone.utc).date()
+    from app.models import FinancialMovement
+    database.add(FinancialMovement(user_id=current_user.id, movement_type="INCOME", amount=payload.amount, concept=f"Pago crédito {sale.sale_number}", payment_method=payload.payment_method, sale_id=sale.id))
+    database.commit()
+    return next(row for row in list_credits(database, current_user).credits if row.id == credit.id)
+
+
+@router.post("/{credit_id}/payments", response_model=CreditRow)
+def create_credit_payment(
+    credit_id: int,
+    payload: CreditPaymentCreate,
+    database: Session = Depends(get_db),
+    current_user: User = Depends(require_section("creditos")),
+) -> CreditRow:
+    return register_credit_payment(credit_id, payload, database, current_user)
 
 
 @router.post("/{credit_id}/pay", response_model=CreditRow)
 def pay_credit(credit_id: int, payment_method: str, database: Session = Depends(get_db), current_user: User = Depends(require_section("creditos"))) -> CreditRow:
     if payment_method not in {"CASH", "NEQUI"}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El pago debe ser en efectivo o Nequi")
-    credit = database.get(Credit, credit_id)
+    credit = database.scalar(select(Credit).where(Credit.id == credit_id).with_for_update())
     if credit is None or credit.status != "PENDING":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Crédito pendiente no encontrado")
-    sale = database.get(Sale, credit.sale_id)
-    credit.status = "PAID"
-    credit.pending_amount = 0
-    credit.paid_at = datetime.now(timezone.utc).date()
-    from app.models import FinancialMovement
-    database.add(FinancialMovement(user_id=current_user.id, movement_type="INCOME", amount=credit.original_amount, concept=f"Pago crédito {sale.sale_number}", payment_method=payment_method, sale_id=sale.id))
-    database.commit()
-    return next(row for row in list_credits(database, current_user).credits if row.id == credit.id)
+    return register_credit_payment(credit_id, CreditPaymentCreate(amount=credit.pending_amount, payment_method=payment_method), database, current_user)
 
 
 @router.get("", response_model=CreditsResponse)

@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Image from "next/image";
-import { Download, Package, Pencil, Plus, Search, X } from "lucide-react";
+import { ArchiveRestore, Download, Package, Pencil, Plus, Search, X } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
 import { downloadExcel } from "@/lib/excel";
 
@@ -83,6 +83,14 @@ export default function ProductsPage() {
   const [purchaseCost, setPurchaseCost] = useState("0");
   const [purchaseMethod, setPurchaseMethod] = useState<"CASH" | "NEQUI">("CASH");
   const [purchaseObservation, setPurchaseObservation] = useState("Compra de Aseo");
+  const [disabledProducts, setDisabledProducts] = useState<Product[]>([]);
+  const [disabledModalOpen, setDisabledModalOpen] = useState(false);
+  const [disabledLoading, setDisabledLoading] = useState(false);
+  const [isAdmin] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const storedUser = sessionStorage.getItem("coffee_gosen_user");
+    return storedUser ? (JSON.parse(storedUser) as { role?: string }).role === "ADMIN" : false;
+  });
 
   async function loadCatalog() {
     const token = sessionStorage.getItem("coffee_gosen_access_token");
@@ -391,6 +399,40 @@ export default function ProductsPage() {
     setProducts((current) => current.map((item) => (item.id === product.id ? (result as Product) : item)));
   }
 
+  async function openDisabledProducts() {
+    setDisabledModalOpen(true);
+    setDisabledLoading(true);
+    setError("");
+    try {
+      const token = sessionStorage.getItem("coffee_gosen_access_token");
+      const response = await fetch(`${apiUrl}/products?include_disabled=true`, { headers: token ? { Authorization: `Bearer ${token}` } : undefined });
+      const result = await response.json();
+      if (!response.ok) throw new Error(apiError(result, "No fue posible cargar los productos deshabilitados."));
+      setDisabledProducts((result as Product[]).filter((product) => !product.is_active));
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "No fue posible cargar los productos deshabilitados.");
+    } finally {
+      setDisabledLoading(false);
+    }
+  }
+
+  async function enableProduct(product: Product) {
+    setSaving(true);
+    setError("");
+    try {
+      const token = sessionStorage.getItem("coffee_gosen_access_token");
+      const response = await fetch(`${apiUrl}/products/${product.id}/enable`, { method: "POST", headers: token ? { Authorization: `Bearer ${token}` } : undefined });
+      const result = await response.json();
+      if (!response.ok) throw new Error(apiError(result, "No fue posible habilitar el producto."));
+      setDisabledProducts((current) => current.filter((item) => item.id !== product.id));
+      await loadCatalog();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "No fue posible habilitar el producto.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function restockProduct(product: Product) {
     setError("");
     setSaving(true);
@@ -529,6 +571,15 @@ export default function ProductsPage() {
       >
         <Download size={16} /> Descargar Excel
       </button>
+      {isAdmin && (
+        <button
+          type="button"
+          onClick={() => void openDisabledProducts()}
+          className="mb-4 ml-2 inline-flex min-h-10 items-center gap-2 border border-[var(--line)] bg-white px-4 text-sm font-semibold text-[var(--blue-main)]"
+        >
+          <ArchiveRestore size={16} /> Ver deshabilitados
+        </button>
+      )}
 
       {loading && (
         <p className="mb-6 border border-[var(--line)] bg-white p-5 text-sm text-[var(--muted)]">
@@ -996,6 +1047,21 @@ export default function ProductsPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {disabledModalOpen && (
+        <div className="fixed inset-0 z-40 grid place-items-center bg-[var(--ink)]/50 p-4">
+          <section role="dialog" aria-modal="true" aria-labelledby="disabled-products-title" className="w-full max-w-2xl border border-[var(--line)] bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-[var(--line)] pb-4">
+              <div>
+                <p className="text-sm text-[var(--muted)]">Administración</p>
+                <h2 id="disabled-products-title" className="mt-1 text-lg font-semibold">Productos deshabilitados</h2>
+              </div>
+              <button type="button" onClick={() => setDisabledModalOpen(false)} aria-label="Cerrar productos deshabilitados"><X size={19} /></button>
+            </div>
+            {disabledLoading ? <p className="p-8 text-center text-sm text-[var(--muted)]">Cargando productos...</p> : disabledProducts.length === 0 ? <p className="p-8 text-center text-sm text-[var(--muted)]">No hay productos deshabilitados.</p> : <div className="mt-4 divide-y divide-[var(--line)]">{disabledProducts.map((product) => <div key={product.id} className="flex items-center justify-between gap-4 py-4"><div><strong>{product.name}</strong><p className="mt-1 text-xs text-[var(--muted)]">Stock: {product.stock} · {product.is_saleable ? "Cafetería" : "Inventario interno"}</p></div><button type="button" disabled={saving} onClick={() => void enableProduct(product)} className="inline-flex min-h-10 items-center gap-2 bg-[var(--blue-main)] px-4 text-sm font-semibold text-white disabled:opacity-60"><ArchiveRestore size={15} /> Habilitar</button></div>)}</div>}
+          </section>
         </div>
       )}
     </AdminPage>

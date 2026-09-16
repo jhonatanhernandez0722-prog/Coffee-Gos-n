@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.api.v1.dependencies import require_admin
 from app.core.permissions import require_section
 from app.core.security import verify_password
 from app.db.session import get_db
@@ -65,8 +66,47 @@ def settle_pending_expenses(database: Session = Depends(get_db), _: User = Depen
     return SettleExpensesResponse(count=len(pending), amount=amount, settled_at=now)
 
 
+@router.patch("/{expense_id}", response_model=ExpenseResponse)
+def update_expense(
+    expense_id: int,
+    payload: ExpenseCreate,
+    database: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+) -> ExpenseResponse:
+    movement, category_name = database.execute(
+        select(FinancialMovement, ExpenseCategory.name)
+        .join(ExpenseCategory, ExpenseCategory.id == FinancialMovement.expense_category_id)
+        .where(FinancialMovement.id == expense_id, FinancialMovement.movement_type == "EXPENSE")
+    ).one_or_none() or (None, None)
+    if movement is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Egreso no encontrado")
+    if movement.settled_at is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No se puede editar un egreso ya liquidado")
+    category = database.get(ExpenseCategory, payload.category_id)
+    if category is None or not category.is_active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La categoría no está disponible")
+    movement.amount = payload.amount
+    movement.payment_method = payload.payment_method
+    movement.expense_category_id = category.id
+    movement.product = payload.product.strip() if payload.product else None
+    movement.concept = payload.observation.strip()
+    movement.observation = payload.observation.strip()
+    database.commit()
+    database.refresh(movement)
+    return ExpenseResponse(
+        id=movement.id,
+        amount=movement.amount,
+        payment_method=movement.payment_method or payload.payment_method,
+        category_name=category.name,
+        product=movement.product,
+        observation=movement.observation or payload.observation,
+        created_at=movement.created_at,
+        settled_at=movement.settled_at,
+    )
+
+
 @router.delete("/{expense_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_expense(expense_id: int, password: str, database: Session = Depends(get_db), current_user: User = Depends(require_section("egresos"))) -> None:
+def delete_expense(expense_id: int, password: str, database: Session = Depends(get_db), current_user: User = Depends(require_admin)) -> None:
     if not verify_password(password, current_user.password_hash):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="La contraseña no es válida")
     movement = database.scalar(select(FinancialMovement).where(FinancialMovement.id == expense_id, FinancialMovement.movement_type == "EXPENSE"))

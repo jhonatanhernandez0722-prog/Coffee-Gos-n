@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
+from app.api.v1.dependencies import require_admin
 from app.core.permissions import require_section
 from app.db.session import get_db
 from app.models import Credit, FinancialMovement, Liability, Product, Sale, SaleItem, User
@@ -83,7 +84,7 @@ def create_liability(payload: LiabilityCreate, database: Session = Depends(get_d
 
 
 @router.patch("/liabilities/{liability_id}", response_model=LiabilityResponse)
-def update_liability(liability_id: int, payload: LiabilityCreate, database: Session = Depends(get_db), _: User = Depends(require_section("balance"))) -> LiabilityResponse:
+def update_liability(liability_id: int, payload: LiabilityCreate, database: Session = Depends(get_db), _: User = Depends(require_admin)) -> LiabilityResponse:
     liability = database.get(Liability, liability_id)
     if liability is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Obligación no encontrada")
@@ -109,7 +110,7 @@ def pay_liability(liability_id: int, database: Session = Depends(get_db), _: Use
 
 
 @router.delete("/liabilities/{liability_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_liability(liability_id: int, database: Session = Depends(get_db), _: User = Depends(require_section("balance"))) -> None:
+def delete_liability(liability_id: int, database: Session = Depends(get_db), _: User = Depends(require_admin)) -> None:
     liability = database.get(Liability, liability_id)
     if liability is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Obligación no encontrada")

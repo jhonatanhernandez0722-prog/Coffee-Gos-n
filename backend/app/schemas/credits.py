@@ -2,6 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from pydantic import BaseModel
+from pydantic import Field
 
 
 class CreditRow(BaseModel):
@@ -24,3 +25,8 @@ class CreditProduct(BaseModel):
 
 class CreditsResponse(BaseModel):
     credits: list[CreditRow]
+
+
+class CreditPaymentCreate(BaseModel):
+    amount: Decimal = Field(gt=0, decimal_places=2)
+    payment_method: str = Field(pattern="^(CASH|NEQUI)$")

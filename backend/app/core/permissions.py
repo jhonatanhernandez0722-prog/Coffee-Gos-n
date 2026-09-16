@@ -18,6 +18,7 @@ SECTIONS = {
     "arqueo": "Arqueo de Caja",
     "balance": "Balance General",
     "temas": "Temas",
+    "configuracion": "Configuración",
 }
 
 

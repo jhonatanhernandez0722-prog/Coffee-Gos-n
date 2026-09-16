@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.v1.dependencies import get_current_user
+from app.api.v1.dependencies import get_current_user, require_admin
 from app.core.permissions import require_any_section, require_section
 from app.core.config import settings
 from app.core.media import upload_to_imagekit
@@ -93,7 +93,7 @@ def update_product(
     product_id: int,
     payload: ProductUpdate,
     database: Session = Depends(get_db),
-    _: User = Depends(require_section("productos")),
+    _: User = Depends(require_admin),
 ) -> Product:
     product = database.get(Product, product_id)
     if product is None:
@@ -190,7 +190,7 @@ async def upload_product_image(
 def enable_product(
     product_id: int,
     database: Session = Depends(get_db),
-    _: User = Depends(require_section("productos")),
+    _: User = Depends(require_admin),
 ) -> Product:
     product = database.get(Product, product_id)
     if product is None:
@@ -205,7 +205,7 @@ def enable_product(
 def delete_product(
     product_id: int,
     database: Session = Depends(get_db),
-    _: User = Depends(require_section("productos")),
+    _: User = Depends(require_admin),
 ) -> dict[str, bool]:
     product = database.get(Product, product_id)
     if product is None:

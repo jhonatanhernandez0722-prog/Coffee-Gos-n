@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowLeft, BarChart3, ChevronDown, CircleDollarSign, Coffee, CreditCard, HandCoins, LayoutDashboard, Package, Palette, QrCode, ReceiptText, Scale, ShoppingBag, UserRound, Users, WalletCards } from "lucide-react";
+import { ArrowLeft, BarChart3, ChevronDown, CircleDollarSign, Coffee, CreditCard, HandCoins, LayoutDashboard, Package, Palette, QrCode, ReceiptText, Scale, ShoppingBag, UserRound, Users, Volume2, WalletCards } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { apiUrl } from "@/lib/api";
 
@@ -24,6 +24,7 @@ const accessByRoute: Record<string, RouteItem> = {
   "/arqueo": { key: "arqueo", label: "Arqueo de Caja", href: "/arqueo", icon: WalletCards },
   "/balance": { key: "balance", label: "Balance General", href: "/balance", icon: Scale },
   "/temas": { key: "temas", label: "Temas", href: "/temas", icon: Palette },
+  "/configuracion": { key: "configuracion", label: "Configuración", href: "/configuracion", icon: Volume2 },
 };
 const navigation = Object.values(accessByRoute).filter((item) => item.key !== "admin");
 
@@ -37,6 +38,7 @@ export function AdminPage({ title, description, children }: { title: string; des
   const isAdminUser = currentUser?.role === "ADMIN";
   const visibleNavigation = navigation.filter((item) => {
     if (!currentUser || isAdminUser) return true;
+    if (item.key === "configuracion") return true;
     return (currentUser.permissions ?? []).includes(item.key);
   });
 
@@ -95,11 +97,11 @@ export function AdminPage({ title, description, children }: { title: string; des
       }
 
       const permissions = user.permissions ?? [];
-      const firstPermission = ["dashboard", "comanda", "productos", "clientes", "creditos", "movimientos", "egresos", "ingresos", "donaciones", "qr_pago", "metricas", "arqueo", "balance", "temas"].find((permission) => permissions.includes(permission));
-      const routes: Record<string, string> = { dashboard: "/dashboard", comanda: "/comanda", productos: "/productos", clientes: "/clientes", creditos: "/creditos", movimientos: "/movimientos", egresos: "/egresos", ingresos: "/ingresar", donaciones: "/donaciones", qr_pago: "/qr-pago", metricas: "/metricas", arqueo: "/arqueo", balance: "/balance", temas: "/temas" };
+      const firstPermission = ["dashboard", "comanda", "productos", "clientes", "creditos", "movimientos", "egresos", "ingresos", "donaciones", "qr_pago", "metricas", "arqueo", "balance", "temas", "configuracion"].find((permission) => permissions.includes(permission));
+      const routes: Record<string, string> = { dashboard: "/dashboard", comanda: "/comanda", productos: "/productos", clientes: "/clientes", creditos: "/creditos", movimientos: "/movimientos", egresos: "/egresos", ingresos: "/ingresar", donaciones: "/donaciones", qr_pago: "/qr-pago", metricas: "/metricas", arqueo: "/arqueo", balance: "/balance", temas: "/temas", configuracion: "/configuracion" };
 
       if (firstPermission) setHomeRoute(routes[firstPermission] ?? "/dashboard");
-      if (routeAccess.key === "admin" || !permissions.includes(routeAccess.key)) {
+      if (routeAccess.key === "admin" || (routeAccess.key !== "configuracion" && !permissions.includes(routeAccess.key))) {
         router.replace(firstPermission ? routes[firstPermission] : "/login");
         return;
       }
