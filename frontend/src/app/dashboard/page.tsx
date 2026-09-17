@@ -322,6 +322,9 @@ export default function DashboardPage() {
         for (const alertId of newAlertIds) {
           unreadEventIds.current.add(alertId);
         }
+        if (newAlertIds.length > 0) {
+          window.dispatchEvent(new Event("coffee-gosen-new-alert"));
+        }
         for (const alertId of Array.from(unreadEventIds.current)) {
           if (!currentEventIds.has(alertId)) unreadEventIds.current.delete(alertId);
         }

@@ -1,14 +1,9 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { apiUrl } from "@/lib/api";
 
 const bellSoundStorageKey = "coffee_gosen_bell_sound_enabled";
 const bellSoundPath = "/Campana%20Tibetana%20Mini.mp3";
-const alertPollInterval = 1000;
-
-type AlertItem = { id: string; created_at?: string | null };
-type AlertsResponse = { alerts: AlertItem[] };
 
 type EnhancedAudioElement = HTMLAudioElement & {
   __coffeeBellGain?: GainNode;
@@ -59,7 +54,6 @@ function playBellSegment(audio: HTMLAudioElement, toneRate: number) {
 }
 
 export function AlertSoundMonitor() {
-  const knownAlertIds = useRef<Set<string> | null>(null);
   const pendingSound = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUnlocked = useRef(false);
@@ -98,54 +92,23 @@ export function AlertSoundMonitor() {
     window.addEventListener("pointerdown", unlockAudio, { once: false });
     window.addEventListener("keydown", unlockAudio, { once: false });
 
-    async function checkAlerts() {
-      const token = sessionStorage.getItem("coffee_gosen_access_token");
-      if (!token) {
-        knownAlertIds.current = null;
-        pendingSound.current = false;
-        return;
-      }
-
-      try {
-        const response = await fetch(`${apiUrl}/dashboard/alerts`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!response.ok || !isCurrent) return;
-        const result = await response.json() as AlertsResponse;
-        const eventAlerts = result.alerts.filter((alert) => alert.created_at);
-        const currentAlertIds = new Set(eventAlerts.map((alert) => alert.id));
-
-        if (knownAlertIds.current === null) {
-          knownAlertIds.current = currentAlertIds;
-          return;
-        }
-
-        const hasNewAlert = eventAlerts.some((alert) => !knownAlertIds.current?.has(alert.id));
-        knownAlertIds.current = currentAlertIds;
-
-        if (hasNewAlert && window.localStorage.getItem(bellSoundStorageKey) !== "false") {
-          const audio = audioRef.current;
-          if (audioUnlocked.current && audio) {
-            playNextTone(audio);
-          } else {
-            pendingSound.current = true;
-          }
-        }
-      } catch {
-        // Alert polling is secondary and must not interrupt the current screen.
+    function handleNewAlert() {
+      if (window.localStorage.getItem(bellSoundStorageKey) === "false") return;
+      const audio = audioRef.current;
+      if (audioUnlocked.current && audio) {
+        playNextTone(audio);
+      } else {
+        pendingSound.current = true;
       }
     }
 
-    void checkAlerts();
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") void checkAlerts();
-    }, alertPollInterval);
+    window.addEventListener("coffee-gosen-new-alert", handleNewAlert);
 
     return () => {
       isCurrent = false;
-      window.clearInterval(interval);
       window.removeEventListener("pointerdown", unlockAudio);
       window.removeEventListener("keydown", unlockAudio);
+      window.removeEventListener("coffee-gosen-new-alert", handleNewAlert);
     };
   }, []);
 
