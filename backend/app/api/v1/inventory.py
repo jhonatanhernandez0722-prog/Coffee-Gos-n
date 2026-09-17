@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -8,7 +9,7 @@ from app.api.v1.dependencies import get_current_user
 from app.core.permissions import require_section
 from app.db.session import get_db
 from app.models import ExpenseCategory, FinancialMovement, InventoryMovement, Product, User
-from app.schemas.inventory import InternalUseCreate, InventorySummary, PurchaseCreate
+from app.schemas.inventory import DamageCreate, InternalUseCreate, InventorySummary, PurchaseCreate
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 
@@ -86,6 +87,57 @@ def register_internal_use(
     database.add(movement)
     database.commit()
     return {"movement_id": movement.id, "product_id": product.id, "stock_after": int(product.stock), "movement_type": "INTERNAL_USE"}
+
+
+@router.post("/damage")
+def register_damage(
+    payload: DamageCreate,
+    database: Session = Depends(get_db),
+    current_user: User = Depends(require_section("productos")),
+) -> dict:
+    product = database.scalar(select(Product).where(Product.id == payload.product_id).with_for_update())
+    if product is None or not product.is_active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Solo se pueden reportar daños de productos activos")
+    if product.stock < payload.quantity:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Stock insuficiente para {product.name}")
+
+    category = database.scalar(select(ExpenseCategory).where(ExpenseCategory.name.ilike("Daño de inventario")).limit(1))
+    if category is None:
+        category = ExpenseCategory(name="Daño de inventario")
+        database.add(category)
+        database.flush()
+
+    product.stock -= payload.quantity
+    loss_amount = product.acquisition_cost * payload.quantity
+    movement = InventoryMovement(
+        product_id=product.id,
+        user_id=current_user.id,
+        movement_type="DAMAGE",
+        quantity=payload.quantity,
+        stock_after=product.stock,
+        observation=payload.observation.strip(),
+    )
+    database.add(movement)
+    database.add(FinancialMovement(
+        user_id=current_user.id,
+        movement_type="EXPENSE",
+        amount=loss_amount,
+        concept=f"Daño de {product.name}",
+        payment_method="CASH",
+        product=product.name,
+        expense_category_id=category.id,
+        observation=payload.observation.strip(),
+        settled_at=datetime.now(timezone.utc),
+    ))
+    database.commit()
+    database.refresh(product)
+    return {
+        "movement_id": movement.id,
+        "product_id": product.id,
+        "stock_after": int(product.stock),
+        "movement_type": "DAMAGE",
+        "expense_amount": float(loss_amount),
+    }
 
 
 @router.get("/aseo-summary", response_model=InventorySummary)

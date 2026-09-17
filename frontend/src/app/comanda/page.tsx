@@ -72,7 +72,8 @@ export default function ComandaPage() {
 
   async function confirmSale() {
     setError("");
-    if (paymentMethod === "CREDIT" && !buyerName.trim()) { setError("Para una venta a crédito debes indicar el nombre del comprador."); return; }
+    if (!buyerName.trim()) { setError("Escribe el nombre del cliente antes de confirmar la venta."); return; }
+    if (!assignedSellerId) { setError("Selecciona el vendedor responsable antes de confirmar la venta."); return; }
     setSaving(true);
     try {
       const token = sessionStorage.getItem("coffee_gosen_access_token");
@@ -105,7 +106,7 @@ export default function ComandaPage() {
 
   return <AdminPage title="Ventas" description="Registra ventas, selecciona el comprador y el método de pago.">
     
-    <section className="mb-6 border border-[var(--line)] bg-white p-5"><label className="text-sm font-semibold">Vendedor asignado <span className="font-normal text-[var(--muted)]">(opcional)<select value={assignedSellerId ?? ""} onChange={(event) => setAssignedSellerId(event.target.value ? Number(event.target.value) : null)} className="mt-2 min-h-11 w-full border border-[var(--line)] bg-white px-3 font-normal"><option value="">Sin asignar</option>{sellers.map((seller) => <option key={seller.id} value={seller.id}>{seller.full_name}</option>)}</select></span></label></section>
+    <section className="mb-6 border border-[var(--line)] bg-white p-5"><label className="text-sm font-semibold">Vendedor asignado <span className="text-red-700">*</span><select required value={assignedSellerId ?? ""} onChange={(event) => setAssignedSellerId(event.target.value ? Number(event.target.value) : null)} className="mt-2 min-h-11 w-full border border-[var(--line)] bg-white px-3 font-normal"><option value="">Selecciona un vendedor</option>{sellers.map((seller) => <option key={seller.id} value={seller.id}>{seller.full_name}</option>)}</select></label></section>
     {paymentMethod === "NEQUI" && <section className="mb-6 border border-emerald-200 bg-emerald-50 p-5"><label className="block text-sm font-semibold text-emerald-950">Soporte de pago <span className="font-normal text-emerald-800">(opcional)</span><input type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={(event) => setSupportFiles(Array.from(event.target.files ?? []).slice(0, 5))} className="mt-2 block min-h-11 w-full border border-emerald-200 bg-white px-3 py-2 text-sm font-normal" /><span className="mt-1 block text-xs font-normal text-emerald-800">Puedes adjuntar hasta 5 imágenes antes de confirmar la venta.</span></label></section>}
     {error && <p role="alert" className="mb-6 border border-red-200 bg-red-50 p-5 text-sm text-red-700">{error}</p>}
     <div className="grid items-start gap-4 md:grid-cols-[minmax(0,1fr)_minmax(280px,380px)] lg:gap-6">

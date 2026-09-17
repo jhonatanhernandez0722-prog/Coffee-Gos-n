@@ -10,11 +10,13 @@ const alertPollInterval = 1000;
 type AlertItem = { id: string };
 type AlertsResponse = { alerts: AlertItem[] };
 
-function playBellSegment(audio: HTMLAudioElement) {
+function playBellSegment(audio: HTMLAudioElement, toneRate: number) {
   const play = () => {
     const segmentLength = Math.min(2.4, audio.duration);
     const maxStart = Math.max(0, audio.duration - segmentLength);
     audio.currentTime = Math.random() * maxStart;
+    audio.playbackRate = toneRate;
+    audio.volume = 1;
     void audio.play().catch(() => undefined);
   };
   if (audio.readyState >= 1) {
@@ -30,6 +32,14 @@ export function AlertSoundMonitor() {
   const pendingSound = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUnlocked = useRef(false);
+  const toneIndex = useRef(0);
+
+  function playNextTone(audio: HTMLAudioElement) {
+    const toneRates = [0.78, 0.92, 1.08, 1.24];
+    const toneRate = toneRates[toneIndex.current % toneRates.length];
+    toneIndex.current += 1;
+    playBellSegment(audio, toneRate);
+  }
 
   useEffect(() => {
     let isCurrent = true;
@@ -38,7 +48,7 @@ export function AlertSoundMonitor() {
       if (audioUnlocked.current) return;
       const audio = audioRef.current ?? new Audio(bellSoundPath);
       audioRef.current = audio;
-      audio.volume = 0.65;
+      audio.volume = 1;
       audio.muted = true;
       void audio.play().then(() => {
         audio.pause();
@@ -47,7 +57,7 @@ export function AlertSoundMonitor() {
         audioUnlocked.current = true;
         if (pendingSound.current && window.localStorage.getItem(bellSoundStorageKey) !== "false") {
           pendingSound.current = false;
-          playBellSegment(audio);
+          playNextTone(audio);
         }
       }).catch(() => {
         audio.muted = false;
@@ -80,7 +90,7 @@ export function AlertSoundMonitor() {
         if (hasNewAlert && window.localStorage.getItem(bellSoundStorageKey) !== "false") {
           const audio = audioRef.current;
           if (audioUnlocked.current && audio) {
-            playBellSegment(audio);
+            playNextTone(audio);
           } else {
             pendingSound.current = true;
           }

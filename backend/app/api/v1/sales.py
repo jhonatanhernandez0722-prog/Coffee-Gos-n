@@ -37,8 +37,10 @@ def create_sale(
     database: Session = Depends(get_db),
     current_user: User = Depends(require_section("comanda")),
 ) -> SaleResponse:
-    if payload.payment_method == "CREDIT" and not payload.customer_id and not payload.buyer_name:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="A credit sale requires a customer")
+    if not payload.customer_id and not payload.buyer_name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Debes indicar el nombre del cliente")
+    if not payload.assigned_seller_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Debes asignar un vendedor")
 
     product_ids = [item.product_id for item in payload.items]
     if len(product_ids) != len(set(product_ids)):
@@ -66,11 +68,9 @@ def create_sale(
                 database.add(customer)
                 database.flush()
 
-        assigned_seller = None
-        if payload.assigned_seller_id:
-            assigned_seller = database.scalar(select(User).where(User.id == payload.assigned_seller_id, User.role == "SELLER", User.is_active.is_(True)))
-            if assigned_seller is None:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El vendedor seleccionado no está disponible")
+        assigned_seller = database.scalar(select(User).where(User.id == payload.assigned_seller_id, User.role == "SELLER", User.is_active.is_(True)))
+        if assigned_seller is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El vendedor seleccionado no está disponible")
 
         subtotal = sum((locked_products[item.product_id].sale_price * item.quantity for item in payload.items), Decimal("0"))
         sale = Sale(

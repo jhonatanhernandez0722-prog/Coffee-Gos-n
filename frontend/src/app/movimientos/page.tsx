@@ -9,7 +9,7 @@ type Movement = { id: number; domain: "inventory" | "financial"; related_id: num
 type MovementGroup = { key: string; created_at: string; inventory: string[]; financial: string[] };
 const money = (value: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(value);
 const quantityLabel = (value: number | null) => value === null ? "-" : Number.isInteger(Number(value)) ? String(Number(value)) : String(value);
-const labels: Record<string, string> = { SALE: "Salida por venta", PURCHASE: "Entrada de inventario", ADJUSTMENT: "Ajuste de inventario", INTERNAL_USE: "Uso interno", INCOME: "Ingreso", EXPENSE: "Egreso" };
+const labels: Record<string, string> = { SALE: "Salida por venta", PURCHASE: "Entrada de inventario", ADJUSTMENT: "Ajuste de inventario", INTERNAL_USE: "Uso interno", DAMAGE: "Pérdida por daño", INCOME: "Ingreso", EXPENSE: "Egreso" };
 
 export default function MovementsPage() {
   const [movements, setMovements] = useState<Movement[]>([]);

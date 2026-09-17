@@ -19,6 +19,12 @@ class InternalUseCreate(BaseModel):
     observation: str | None = Field(default=None, max_length=500)
 
 
+class DamageCreate(BaseModel):
+    product_id: int = Field(gt=0)
+    quantity: int = Field(gt=0)
+    observation: str = Field(min_length=2, max_length=500)
+
+
 class InventorySummary(BaseModel):
     product_count: int
     total_units: Decimal

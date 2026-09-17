@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Image from "next/image";
-import { ArchiveRestore, Download, Package, Pencil, Plus, Search, X } from "lucide-react";
+import { ArchiveRestore, Download, Package, PackageX, Pencil, Plus, Search, X } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
 import { downloadExcel } from "@/lib/excel";
 
@@ -78,6 +78,9 @@ export default function ProductsPage() {
   const [takeObservation, setTakeObservation] = useState("Consumo interno");
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [takeSellerId, setTakeSellerId] = useState("");
+  const [damageTarget, setDamageTarget] = useState<Product | null>(null);
+  const [damageQuantity, setDamageQuantity] = useState("1");
+  const [damageObservation, setDamageObservation] = useState("Producto dañado");
   const [purchaseTarget, setPurchaseTarget] = useState<Product | null>(null);
   const [purchaseQuantity, setPurchaseQuantity] = useState("1");
   const [purchaseCost, setPurchaseCost] = useState("0");
@@ -509,6 +512,44 @@ export default function ProductsPage() {
     }
   }
 
+  function openDamageDialog(product: Product) {
+    setDamageTarget(product);
+    setDamageQuantity("1");
+    setDamageObservation("Producto dañado");
+    setError("");
+  }
+
+  async function reportDamage(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!damageTarget) return;
+    const quantity = Number(damageQuantity);
+    if (!Number.isInteger(quantity) || quantity <= 0 || quantity > Number(damageTarget.stock)) {
+      setError("La cantidad debe ser un número entero y no superar el stock disponible.");
+      return;
+    }
+    if (damageObservation.trim().length < 2) {
+      setError("Escribe el motivo del daño.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const token = sessionStorage.getItem("coffee_gosen_access_token");
+      const response = await fetch(`${apiUrl}/inventory/damage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ product_id: damageTarget.id, quantity, observation: damageObservation.trim() }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(apiError(result, "No fue posible reportar el daño."));
+      setProducts((current) => current.map((item) => item.id === damageTarget.id ? { ...item, stock: Number(result.stock_after) } : item));
+      setDamageTarget(null);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "No fue posible reportar el daño.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const categoryName = (product: Product) => categories.find((category) => category.id === product.category_id)?.name.toLowerCase() ?? "";
   const visibleProducts = products.filter((product) => {
     const name = categoryName(product);
@@ -895,6 +936,14 @@ export default function ProductsPage() {
               )}
               <button
                 type="button"
+                disabled={Number(product.stock) <= 0 || saving}
+                onClick={() => openDamageDialog(product)}
+                className="inline-flex min-h-9 items-center gap-2 border border-red-200 bg-red-50 px-3 text-xs font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <PackageX size={14} /> Reportar daño
+              </button>
+              <button
+                type="button"
                 disabled={saving}
                 onClick={() => restockProduct(product)}
                 className="min-h-9 bg-emerald-600 px-3 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
@@ -981,6 +1030,38 @@ export default function ProductsPage() {
               <button disabled={saving} className="min-h-11 bg-[var(--blue-main)] px-4 text-sm font-semibold text-white disabled:opacity-60">
                 {saving ? "Guardando..." : "Registrar compra"}
               </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {damageTarget && (
+        <div className="fixed inset-0 z-30 grid place-items-center bg-[var(--ink)]/50 p-4">
+          <form onSubmit={reportDamage} className="w-full max-w-md border border-red-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-red-700">Pérdida de inventario</p>
+                <h2 className="mt-1 text-lg font-semibold">Reportar daño: {damageTarget.name}</h2>
+              </div>
+              <button type="button" onClick={() => setDamageTarget(null)} aria-label="Cerrar reporte de daño">
+                <X size={19} />
+              </button>
+            </div>
+
+            <label className="mt-5 block text-sm font-semibold">
+              Cantidad disponible: {damageTarget.stock}
+              <input required min="1" max={Number(damageTarget.stock)} step="1" type="number" value={damageQuantity} onChange={(event) => setDamageQuantity(event.target.value)} className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal" />
+            </label>
+
+            <label className="mt-4 block text-sm font-semibold">
+              Motivo del daño
+              <textarea required minLength={2} maxLength={500} value={damageObservation} onChange={(event) => setDamageObservation(event.target.value)} rows={3} className="mt-2 w-full border border-[var(--line)] px-3 py-2 font-normal" />
+            </label>
+            <p className="mt-3 text-xs leading-5 text-[var(--muted)]">Se descontará el stock y se registrará un egreso por el costo de adquisición del producto.</p>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => setDamageTarget(null)} className="min-h-11 border border-[var(--line)] px-4 text-sm font-semibold">Cancelar</button>
+              <button disabled={saving} className="inline-flex min-h-11 items-center gap-2 bg-red-700 px-4 text-sm font-semibold text-white disabled:opacity-60"><PackageX size={16} /> {saving ? "Registrando..." : "Registrar daño"}</button>
             </div>
           </form>
         </div>

@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Bell, Volume2, VolumeX } from "lucide-react";
+import { Bell, Trash2, Volume2, VolumeX } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
+import { apiUrl } from "@/lib/api";
 
 const bellSoundStorageKey = "coffee_gosen_bell_sound_enabled";
 const bellSoundPath = "/Campana%20Tibetana%20Mini.mp3";
@@ -26,13 +27,23 @@ export default function ConfiguracionPage() {
     const audio = new Audio(bellSoundPath);
     audioRef.current?.pause();
     audioRef.current = audio;
-    audio.volume = 0.65;
+    audio.volume = 1;
+    audio.playbackRate = [0.78, 0.92, 1.08, 1.24][Math.floor(Math.random() * 4)];
     audio.addEventListener("loadedmetadata", () => {
       const segmentLength = Math.min(2.4, audio.duration);
       const maxStart = Math.max(0, audio.duration - segmentLength);
       audio.currentTime = Math.random() * maxStart;
       void audio.play().catch(() => setNotice("El navegador bloqueó el sonido. Presiona de nuevo para probarlo."));
     }, { once: true });
+  }
+
+  async function cleanupData() {
+    if (!window.confirm("Se eliminarán todos los ingresos independientes, créditos y clientes. Las ventas, productos y saldo total se conservarán. ¿Continuar?")) return;
+    const token = sessionStorage.getItem("coffee_gosen_access_token");
+    const response = await fetch(`${apiUrl}/incomes/cleanup`, { method: "DELETE", headers: token ? { Authorization: `Bearer ${token}` } : undefined });
+    const result = await response.json();
+    if (!response.ok) { setNotice(result.detail ?? "No fue posible limpiar los datos."); return; }
+    setNotice(`Limpieza completada: ${result.incomes_deleted} ingresos, ${result.credits_deleted} créditos y ${result.customers_deleted} clientes.`);
   }
 
   return (
@@ -54,6 +65,11 @@ export default function ConfiguracionPage() {
           <button type="button" onClick={previewSound} disabled={!soundEnabled} className="inline-flex min-h-11 items-center gap-2 bg-[var(--blue-main)] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><Volume2 size={16} /> Probar sonido</button>
           {notice && <p role="status" className="text-sm text-emerald-700">{notice}</p>}
         </div>
+      </section>
+      <section className="mt-6 max-w-2xl border border-red-200 bg-red-50 p-6">
+        <h2 className="font-semibold text-red-950">Limpieza de datos</h2>
+        <p className="mt-1 text-sm leading-6 text-red-800">Elimina ingresos independientes, créditos y clientes. Conserva el saldo total, las ventas y los productos.</p>
+        <button type="button" onClick={() => void cleanupData()} className="mt-4 inline-flex min-h-11 items-center gap-2 border border-red-700 bg-white px-4 text-sm font-semibold text-red-700"><Trash2 size={16} /> Limpiar ingresos, créditos y clientes</button>
       </section>
     </AdminPage>
   );
