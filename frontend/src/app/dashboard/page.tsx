@@ -737,7 +737,7 @@ export default function DashboardPage() {
                         {dailyProducts.map((product) => (
                           <tr key={product.product_name} className="border-b border-[var(--line)] last:border-0">
                             <td className="p-3 font-semibold">{product.product_name}</td>
-                            <td className="p-3">{product.units_sold}</td>
+                            <td className="p-3">{formatUnits(Number(product.units_sold))}</td>
                             <td className="p-3">{formatCurrency(product.unit_price)}</td>
                             <td className="p-3">{formatCurrency(product.sales_total)}</td>
                             <td className="p-3">{formatCurrency(product.cost_total)}</td>
@@ -886,7 +886,7 @@ export default function DashboardPage() {
                                 <td className="p-3 font-semibold">
                                   {product.product_name}
                                 </td>
-                                <td className="p-3">{product.units_sold}</td>
+                                <td className="p-3">{formatUnits(Number(product.units_sold))}</td>
                                 <td className="p-3">
                                   {formatCurrency(product.unit_price)}
                                 </td>

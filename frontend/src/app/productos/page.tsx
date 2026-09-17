@@ -957,7 +957,7 @@ export default function ProductsPage() {
               </div>
               <div className="border border-[var(--line)] bg-slate-50 p-3">
                 <p className="text-[11px] uppercase tracking-wide text-[var(--muted)]">Reposición</p>
-                <strong className="mt-1 block text-sm">+{product.restock_quantity}</strong>
+                <strong className="mt-1 block text-sm">+{product.unit === "UNIT" ? wholeNumber(product.restock_quantity) : product.restock_quantity}</strong>
               </div>
             </div>
 
@@ -1007,7 +1007,7 @@ export default function ProductsPage() {
                 onClick={() => restockProduct(product)}
                 className="min-h-9 bg-emerald-600 px-3 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
               >
-                Restablecer (+{product.restock_quantity})
+                Restablecer (+{product.unit === "UNIT" ? wholeNumber(product.restock_quantity) : product.restock_quantity})
               </button>
               <button
                 type="button"
