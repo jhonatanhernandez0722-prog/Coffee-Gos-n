@@ -1,5 +1,7 @@
 from decimal import Decimal
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -20,12 +22,13 @@ class ProductCreate(BaseModel):
     name: str = Field(min_length=2, max_length=150)
     description: str | None = Field(default=None, max_length=1000)
     image_url: str | None = Field(default=None, max_length=500)
+    unit: Literal["KG", "ML", "UNIT"] = "UNIT"
     is_saleable: bool = True
     sale_price: Decimal = Field(ge=0, decimal_places=2)
     acquisition_cost: Decimal = Field(ge=0, decimal_places=2)
-    stock: int = Field(ge=0)
-    low_stock_threshold: int = Field(default=5, ge=0)
-    restock_quantity: int = Field(default=10, gt=0)
+    stock: Decimal = Field(ge=0, decimal_places=3)
+    low_stock_threshold: Decimal = Field(default=5, ge=0, decimal_places=3)
+    restock_quantity: Decimal = Field(default=10, gt=0, decimal_places=3)
 
 
 class ProductUpdate(BaseModel):
@@ -33,12 +36,13 @@ class ProductUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=150)
     description: str | None = Field(default=None, max_length=1000)
     image_url: str | None = Field(default=None, max_length=500)
+    unit: Literal["KG", "ML", "UNIT"] | None = None
     is_saleable: bool | None = None
     sale_price: Decimal | None = Field(default=None, ge=0, decimal_places=2)
     acquisition_cost: Decimal | None = Field(default=None, ge=0, decimal_places=2)
-    stock: int | None = Field(default=None, ge=0)
-    low_stock_threshold: int | None = Field(default=None, ge=0)
-    restock_quantity: int | None = Field(default=None, gt=0)
+    stock: Decimal | None = Field(default=None, ge=0, decimal_places=3)
+    low_stock_threshold: Decimal | None = Field(default=None, ge=0, decimal_places=3)
+    restock_quantity: Decimal | None = Field(default=None, gt=0, decimal_places=3)
 
 
 class ProductResponse(ProductCreate):

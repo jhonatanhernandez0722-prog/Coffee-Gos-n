@@ -67,6 +67,11 @@ export default function SellersPage() {
   const [permissions, setPermissions] = useState<PermissionKey[]>(["comanda"]);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [isAdmin] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const storedUser = sessionStorage.getItem("coffee_gosen_user");
+    return storedUser ? (JSON.parse(storedUser) as { role?: string }).role === "ADMIN" : false;
+  });
 
   async function loadSellers() {
     const token = sessionStorage.getItem("coffee_gosen_access_token");
@@ -254,19 +259,21 @@ export default function SellersPage() {
                   >
                     {seller.is_active ? "Activo" : "Inactivo"}
                   </span>
-                  <button
-                    title="Editar vendedor"
-                    onClick={() => editSeller(seller)}
-                    className="grid size-9 place-items-center border border-[var(--line)] text-[var(--blue-main)]"
-                  >
-                    <Pencil size={15} />
-                  </button>
-                  <button
-                    onClick={() => toggleActive(seller)}
-                    className="min-h-9 border border-[var(--line)] px-3 text-xs font-semibold"
-                  >
-                    {seller.is_active ? "Desactivar" : "Activar"}
-                  </button>
+                  {isAdmin && <>
+                    <button
+                      title="Editar vendedor"
+                      onClick={() => editSeller(seller)}
+                      className="grid size-9 place-items-center border border-[var(--line)] text-[var(--blue-main)]"
+                    >
+                      <Pencil size={15} />
+                    </button>
+                    <button
+                      onClick={() => toggleActive(seller)}
+                      className="min-h-9 border border-[var(--line)] px-3 text-xs font-semibold"
+                    >
+                      {seller.is_active ? "Desactivar" : "Activar"}
+                    </button>
+                  </>}
                 </div>
               </article>
             ))}
@@ -277,7 +284,7 @@ export default function SellersPage() {
             )}
           </div>
         </section>
-        <form
+        {isAdmin && <form
           onSubmit={saveSeller}
           className="border border-[var(--ink)] bg-white p-5"
         >
@@ -389,7 +396,7 @@ export default function SellersPage() {
                 ? "Guardar cambios"
                 : "Crear vendedor"}
           </button>
-        </form>
+        </form>}
       </div>
     </AdminPage>
   );

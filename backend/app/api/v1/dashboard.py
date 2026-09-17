@@ -234,7 +234,11 @@ def dashboard_alerts(
     alerts = alerts[:15]
     alert_ids = [alert.id for alert in alerts]
     read_alert_ids = set(database.scalars(select(AlertRead.alert_id).where(AlertRead.user_id == current_user.id, AlertRead.alert_id.in_(alert_ids))).all()) if alert_ids else set()
-    return AlertsResponse(alerts=alerts, unread_count=sum(alert.id not in read_alert_ids for alert in alerts))
+    unread_count = sum(
+        alert.created_at is not None and alert.id not in read_alert_ids
+        for alert in alerts
+    )
+    return AlertsResponse(alerts=alerts, unread_count=unread_count)
 
 
 @router.post("/alerts/read", status_code=204)

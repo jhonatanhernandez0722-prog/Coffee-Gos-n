@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 class PurchaseCreate(BaseModel):
     product_id: int = Field(gt=0)
-    quantity: int = Field(gt=0)
+    quantity: Decimal = Field(gt=0, decimal_places=3)
     unit_cost: Decimal = Field(gt=0)
     payment_method: Literal["CASH", "NEQUI"] = "CASH"
     observation: str | None = Field(default=None, max_length=500)
@@ -14,14 +14,14 @@ class PurchaseCreate(BaseModel):
 
 class InternalUseCreate(BaseModel):
     product_id: int = Field(gt=0)
-    quantity: int = Field(gt=0)
+    quantity: Decimal = Field(gt=0, decimal_places=3)
     assigned_seller_id: int | None = Field(default=None, gt=0)
     observation: str | None = Field(default=None, max_length=500)
 
 
 class DamageCreate(BaseModel):
     product_id: int = Field(gt=0)
-    quantity: int = Field(gt=0)
+    quantity: Decimal = Field(gt=0, decimal_places=3)
     observation: str = Field(min_length=2, max_length=500)
 
 

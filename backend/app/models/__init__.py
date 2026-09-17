@@ -1,5 +1,6 @@
 from app.models.domain import (
     AlertRead,
+    AppSetting,
     Category,
     Credit,
     Customer,

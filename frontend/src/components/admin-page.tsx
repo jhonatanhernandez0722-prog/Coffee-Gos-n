@@ -26,7 +26,7 @@ const accessByRoute: Record<string, RouteItem> = {
   "/temas": { key: "temas", label: "Temas", href: "/temas", icon: Palette },
   "/configuracion": { key: "configuracion", label: "Configuración", href: "/configuracion", icon: Volume2 },
 };
-const navigation = Object.values(accessByRoute).filter((item) => item.key !== "admin");
+const navigation = Object.values(accessByRoute);
 
 export function AdminPage({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
   const pathname = usePathname();
@@ -38,6 +38,7 @@ export function AdminPage({ title, description, children }: { title: string; des
   const isAdminUser = currentUser?.role === "ADMIN";
   const visibleNavigation = navigation.filter((item) => {
     if (!currentUser || isAdminUser) return true;
+    if (item.key === "admin") return currentUser.role === "VIEWER";
     if (item.key === "configuracion") return true;
     return (currentUser.permissions ?? []).includes(item.key);
   });
@@ -101,7 +102,7 @@ export function AdminPage({ title, description, children }: { title: string; des
       const routes: Record<string, string> = { dashboard: "/dashboard", comanda: "/comanda", productos: "/productos", clientes: "/clientes", creditos: "/creditos", movimientos: "/movimientos", egresos: "/egresos", ingresos: "/ingresar", donaciones: "/donaciones", qr_pago: "/qr-pago", metricas: "/metricas", arqueo: "/arqueo", balance: "/balance", temas: "/temas", configuracion: "/configuracion" };
 
       if (firstPermission) setHomeRoute(routes[firstPermission] ?? "/dashboard");
-      if (routeAccess.key === "admin" || (routeAccess.key !== "configuracion" && !permissions.includes(routeAccess.key))) {
+      if ((routeAccess.key === "admin" && user.role !== "VIEWER") || (routeAccess.key !== "admin" && routeAccess.key !== "configuracion" && !permissions.includes(routeAccess.key))) {
         router.replace(firstPermission ? routes[firstPermission] : "/login");
         return;
       }

@@ -4,7 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.v1.dependencies import get_current_user, require_admin
-from app.core.permissions import SECTIONS, user_sections
+from app.core.permissions import SECTIONS, require_admin_or_viewer, user_sections
 from app.core.security import hash_password
 from app.db.session import get_db
 from app.models import User, UserPermission
@@ -31,8 +31,8 @@ def validate_permissions(permissions: list[str]) -> None:
 
 
 @router.get("", response_model=list[SellerResponse])
-def list_sellers(database: Session = Depends(get_db), _: User = Depends(require_admin)) -> list[SellerResponse]:
-    sellers = database.scalars(select(User).where(User.role == "SELLER").order_by(User.full_name)).all()
+def list_sellers(database: Session = Depends(get_db), _: User = Depends(require_admin_or_viewer)) -> list[SellerResponse]:
+    sellers = database.scalars(select(User).where(User.role.in_(["SELLER", "VIEWER"])).order_by(User.full_name)).all()
     return [seller_response(seller) for seller in sellers]
 
 

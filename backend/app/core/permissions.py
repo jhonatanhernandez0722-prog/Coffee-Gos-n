@@ -43,3 +43,9 @@ def require_any_section(*sections: str):
         return current_user
 
     return dependency
+
+
+def require_admin_or_viewer(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role not in {"ADMIN", "VIEWER"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator or read-only role required")
+    return current_user

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { FormEvent, useEffect, useState } from "react";
 import Image from "next/image";
@@ -17,12 +17,12 @@ type Product = {
   restock_quantity: number;
   is_active: boolean;
   is_saleable: boolean;
+  unit: "KG" | "ML" | "UNIT";
   image_url?: string | null;
 };
 
 type Category = { id: number; name: string; is_active: boolean };
-type Section = "sale" | "insumos" | "desechables" | "limpieza";
-type Seller = { id: number; full_name: string };
+type Section = "sale" | "insumos" | "desechables" | "limpieza" | "started";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ??
   (process.env.NODE_ENV === "production"
@@ -50,13 +50,20 @@ const imageUrl = (path?: string | null) => {
   }
 };
 
+const wholeNumber = (value: number | string | null | undefined) => {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? Math.round(parsed) : 0;
+};
+
 const apiError = (result: { detail?: string | { msg?: string }[] }, fallback: string) =>
   Array.isArray(result.detail)
     ? result.detail.map((item) => item.msg).filter(Boolean).join(". ") || fallback
     : result.detail || fallback;
+  const unitLabels: Record<Product["unit"], string> = { KG: "kg", ML: "ml", UNIT: "unidad" };
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [startedProducts, setStartedProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [section, setSection] = useState<Section>("sale");
   const [search, setSearch] = useState("");
@@ -69,18 +76,18 @@ export default function ProductsPage() {
   const [cost, setCost] = useState("");
   const [stock, setStock] = useState("");
   const [restockQuantity, setRestockQuantity] = useState("10");
+  const [unit, setUnit] = useState<"KG" | "ML" | "UNIT">("UNIT");
   const [image, setImage] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [takeTarget, setTakeTarget] = useState<Product | null>(null);
   const [takeQuantity, setTakeQuantity] = useState("1");
+  const [takeAll, setTakeAll] = useState(false);
   const [takeObservation, setTakeObservation] = useState("Consumo interno");
-  const [sellers, setSellers] = useState<Seller[]>([]);
-  const [takeSellerId, setTakeSellerId] = useState("");
   const [damageTarget, setDamageTarget] = useState<Product | null>(null);
   const [damageQuantity, setDamageQuantity] = useState("1");
-  const [damageObservation, setDamageObservation] = useState("Producto dañado");
+  const [damageObservation, setDamageObservation] = useState("Producto daï¿½ado");
   const [purchaseTarget, setPurchaseTarget] = useState<Product | null>(null);
   const [purchaseQuantity, setPurchaseQuantity] = useState("1");
   const [purchaseCost, setPurchaseCost] = useState("0");
@@ -98,22 +105,28 @@ export default function ProductsPage() {
   async function loadCatalog() {
     const token = sessionStorage.getItem("coffee_gosen_access_token");
     const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
-    const [productsResponse, categoriesResponse] = await Promise.all([
+    const [productsResponse, categoriesResponse, startedResponse] = await Promise.all([
       fetch(`${apiUrl}/products`, { headers }),
       fetch(`${apiUrl}/categories`, { headers }),
+      fetch(`${apiUrl}/inventory/started`, { headers }),
     ]);
     const productsResult = await productsResponse.json();
     const categoriesResult = await categoriesResponse.json();
+    const startedResult = await startedResponse.json();
 
     if (!productsResponse.ok) {
       throw new Error(apiError(productsResult, "No fue posible cargar los productos."));
     }
     if (!categoriesResponse.ok) {
-      throw new Error(apiError(categoriesResult, "No fue posible cargar las categorías."));
+      throw new Error(apiError(categoriesResult, "No fue posible cargar las categorï¿½as."));
+    }
+    if (!startedResponse.ok) {
+      throw new Error(apiError(startedResult, "No fue posible cargar los productos comenzados."));
     }
 
     setProducts(productsResult as Product[]);
     setCategories(categoriesResult as Category[]);
+    setStartedProducts(startedResult as Product[]);
   }
 
   useEffect(() => {
@@ -121,16 +134,6 @@ export default function ProductsPage() {
       .then(loadCatalog)
       .catch((requestError: Error) => setError(requestError.message))
       .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    const token = sessionStorage.getItem("coffee_gosen_access_token");
-    fetch(`${apiUrl}/users/available`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    })
-      .then(async (response) => (response.ok ? ((await response.json()) as Seller[]) : []))
-      .then(setSellers)
-      .catch(() => setSellers([]));
   }, []);
 
   function openCreate() {
@@ -142,6 +145,7 @@ export default function ProductsPage() {
     setCost("");
     setStock("");
     setRestockQuantity("10");
+    setUnit("UNIT");
     setImage(null);
     setShowForm(true);
   }
@@ -155,6 +159,7 @@ export default function ProductsPage() {
     setCost(String(product.acquisition_cost));
     setStock(String(product.stock));
     setRestockQuantity(String(product.restock_quantity));
+    setUnit(product.unit ?? "UNIT");
     setImage(null);
     setShowForm(true);
   }
@@ -174,8 +179,8 @@ export default function ProductsPage() {
 
     const quantity = Number(purchaseQuantity);
     const unitCost = Number(purchaseCost);
-    if (!Number.isInteger(quantity) || quantity <= 0) {
-      setError("La cantidad de compra debe ser un número entero mayor a cero.");
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      setError("La cantidad de compra debe ser mayor a cero.");
       return;
     }
     if (!Number.isFinite(unitCost) || unitCost <= 0) {
@@ -234,7 +239,7 @@ export default function ProductsPage() {
 
         if (categorySelection === "new") {
           const wantedCategory = newCategoryName.trim();
-          if (!wantedCategory) throw new Error("Escribe el nombre de la nueva categoría.");
+          if (!wantedCategory) throw new Error("Escribe el nombre de la nueva categorï¿½a.");
 
           const categoryResponse = await fetch(`${apiUrl}/categories`, {
             method: "POST",
@@ -243,7 +248,7 @@ export default function ProductsPage() {
           });
           const categoryResult = await categoryResponse.json();
           if (!categoryResponse.ok) {
-            throw new Error(apiError(categoryResult, "No fue posible crear la categoría."));
+            throw new Error(apiError(categoryResult, "No fue posible crear la categorï¿½a."));
           }
 
           const createdCategory = categoryResult as Category;
@@ -258,6 +263,7 @@ export default function ProductsPage() {
           body: JSON.stringify({
             category_id: categoryId,
             name: name.trim(),
+            unit: section === "sale" ? "UNIT" : unit,
             sale_price: section === "sale" ? Number(salePrice) : 0,
             acquisition_cost: Number(cost),
             stock: Number(stock),
@@ -285,7 +291,7 @@ export default function ProductsPage() {
 
           const imageResult = await imageResponse.json();
           if (!imageResponse.ok) {
-            throw new Error(apiError(imageResult, "El producto se actualizó, pero no fue posible guardar la imagen."));
+            throw new Error(apiError(imageResult, "El producto se actualizï¿½, pero no fue posible guardar la imagen."));
           }
           savedProduct = imageResult as Product;
         }
@@ -303,7 +309,7 @@ export default function ProductsPage() {
 
       if ((categorySelection === "new" && section === "sale") || (!category && section !== "sale")) {
         const wantedCategory = section === "sale" ? newCategoryName.trim() : inventoryCategoryName;
-        if (!wantedCategory) throw new Error("Escribe el nombre de la nueva categoría.");
+        if (!wantedCategory) throw new Error("Escribe el nombre de la nueva categorï¿½a.");
 
         const categoryResponse = await fetch(`${apiUrl}/categories`, {
           method: "POST",
@@ -312,14 +318,14 @@ export default function ProductsPage() {
         });
         const categoryResult = await categoryResponse.json();
         if (!categoryResponse.ok) {
-          throw new Error(apiError(categoryResult, "No fue posible crear la categoría."));
+          throw new Error(apiError(categoryResult, "No fue posible crear la categorï¿½a."));
         }
 
         category = categoryResult as Category;
         setCategories((current) => [...current, category as Category].sort((first, second) => first.name.localeCompare(second.name)));
       }
 
-      if (!category) throw new Error("Selecciona una categoría.");
+      if (!category) throw new Error("Selecciona una categorï¿½a.");
 
       const response = await fetch(`${apiUrl}/products`, {
         method: "POST",
@@ -327,6 +333,7 @@ export default function ProductsPage() {
         body: JSON.stringify({
           category_id: category.id,
           name: name.trim(),
+          unit: section === "sale" ? "UNIT" : unit,
           sale_price: section === "sale" ? Number(salePrice) : 0,
           acquisition_cost: Number(cost),
           stock: Number(stock),
@@ -351,7 +358,7 @@ export default function ProductsPage() {
 
         const imageResult = await imageResponse.json();
         if (!imageResponse.ok) {
-          throw new Error(apiError(imageResult, "El producto se creó, pero no fue posible guardar la imagen."));
+          throw new Error(apiError(imageResult, "El producto se creï¿½, pero no fue posible guardar la imagen."));
         }
         savedProduct = imageResult as Product;
       }
@@ -366,7 +373,7 @@ export default function ProductsPage() {
   }
 
   async function deleteProduct(product: Product) {
-    if (!window.confirm(`¿Eliminar definitivamente ${product.name}? Esta acción no se puede deshacer.`)) return;
+    if (!window.confirm(`ï¿½Eliminar definitivamente ${product.name}? Esta acciï¿½n no se puede deshacer.`)) return;
     setError("");
     setSaving(true);
 
@@ -461,8 +468,8 @@ export default function ProductsPage() {
   function openTakeDialog(product: Product) {
     setTakeTarget(product);
     setTakeQuantity("1");
+    setTakeAll(false);
     setTakeObservation("Consumo interno");
-    setTakeSellerId("");
     setError("");
   }
 
@@ -470,13 +477,9 @@ export default function ProductsPage() {
     event.preventDefault();
     if (!takeTarget) return;
 
-    const quantity = Number(takeQuantity);
-    if (!Number.isInteger(quantity) || quantity <= 0 || quantity > Number(takeTarget.stock)) {
-      setError("La cantidad debe ser un número entero y no superar el stock disponible.");
-      return;
-    }
-    if (!takeSellerId) {
-      setError("Selecciona la vendedora responsable de la toma.");
+    const quantity = takeAll ? Number(takeTarget.stock) : Number(takeQuantity);
+    if (!Number.isFinite(quantity) || quantity <= 0 || quantity > Number(takeTarget.stock)) {
+      setError("La cantidad debe ser mayor a cero y no superar el stock disponible.");
       return;
     }
 
@@ -493,7 +496,6 @@ export default function ProductsPage() {
         body: JSON.stringify({
           product_id: takeTarget.id,
           quantity,
-          assigned_seller_id: Number(takeSellerId),
           observation: takeObservation.trim() || "Consumo interno",
         }),
       });
@@ -503,6 +505,13 @@ export default function ProductsPage() {
       setProducts((current) =>
         current.map((item) => (item.id === takeTarget.id ? { ...item, stock: Number(result.stock_after) } : item)),
       );
+      setStartedProducts((current) => {
+        if (Number(result.stock_after) <= 0) return current.filter((item) => item.id !== takeTarget.id);
+        const startedProduct = { ...takeTarget, stock: Number(result.stock_after) };
+        return current.some((item) => item.id === takeTarget.id)
+          ? current.map((item) => (item.id === takeTarget.id ? startedProduct : item))
+          : [...current, startedProduct];
+      });
       setTakeTarget(null);
 
     } catch (requestError) {
@@ -515,7 +524,7 @@ export default function ProductsPage() {
   function openDamageDialog(product: Product) {
     setDamageTarget(product);
     setDamageQuantity("1");
-    setDamageObservation("Producto dañado");
+    setDamageObservation("Producto daï¿½ado");
     setError("");
   }
 
@@ -523,12 +532,12 @@ export default function ProductsPage() {
     event.preventDefault();
     if (!damageTarget) return;
     const quantity = Number(damageQuantity);
-    if (!Number.isInteger(quantity) || quantity <= 0 || quantity > Number(damageTarget.stock)) {
-      setError("La cantidad debe ser un número entero y no superar el stock disponible.");
+    if (!Number.isFinite(quantity) || quantity <= 0 || quantity > Number(damageTarget.stock)) {
+      setError("La cantidad debe ser mayor a cero y no superar el stock disponible.");
       return;
     }
     if (damageObservation.trim().length < 2) {
-      setError("Escribe el motivo del daño.");
+      setError("Escribe el motivo del daï¿½o.");
       return;
     }
     setSaving(true);
@@ -540,18 +549,19 @@ export default function ProductsPage() {
         body: JSON.stringify({ product_id: damageTarget.id, quantity, observation: damageObservation.trim() }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(apiError(result, "No fue posible reportar el daño."));
+      if (!response.ok) throw new Error(apiError(result, "No fue posible reportar el daï¿½o."));
       setProducts((current) => current.map((item) => item.id === damageTarget.id ? { ...item, stock: Number(result.stock_after) } : item));
       setDamageTarget(null);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "No fue posible reportar el daño.");
+      setError(requestError instanceof Error ? requestError.message : "No fue posible reportar el daï¿½o.");
     } finally {
       setSaving(false);
     }
   }
 
   const categoryName = (product: Product) => categories.find((category) => category.id === product.category_id)?.name.toLowerCase() ?? "";
-  const visibleProducts = products.filter((product) => {
+  const visibleProducts = (section === "started" ? startedProducts : products).filter((product) => {
+    if (section === "started") return product.name.toLowerCase().includes(search.toLowerCase());
     const name = categoryName(product);
     const matchesSection = section === "sale"
       ? product.is_saleable
@@ -560,7 +570,7 @@ export default function ProductsPage() {
   });
   const stockMetrics = {
     productCount: visibleProducts.length,
-    totalUnits: visibleProducts.reduce((total, product) => total + Number(product.stock), 0),
+    totalUnits: Number(visibleProducts.reduce((total, product) => total + Number(product.stock), 0).toFixed(3)),
   };
 
   function exportProducts() {
@@ -570,8 +580,8 @@ export default function ProductsPage() {
         Tipo: product.is_saleable ? "Venta" : "Aseo",
         Precio: product.sale_price,
         Costo: product.acquisition_cost,
-        Stock: product.stock,
-        "Stock mínimo": product.low_stock_threshold,
+        Stock: product.unit === "UNIT" ? wholeNumber(product.stock) : Number(product.stock),
+        "Stock mï¿½nimo": product.low_stock_threshold,
         Estado: product.is_active ? "Activo" : "Deshabilitado",
       })),
       "productos.xlsx",
@@ -583,7 +593,7 @@ export default function ProductsPage() {
     <AdminPage title="Productos" description="Administra productos de venta y el stock interno de Aseo.">
       {showForm && (
         <label className="mb-6 block max-w-sm border border-[var(--line)] bg-white p-4 text-sm font-semibold">
-          Reposición por botón
+          Reposiciï¿½n por botï¿½n
           <input
             required
             min="1"
@@ -594,7 +604,7 @@ export default function ProductsPage() {
             className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal"
           />
           <span className="mt-1 block text-xs font-normal text-[var(--muted)]">
-            Unidades que se sumarán al restablecer el stock.
+            Unidades que se sumarï¿½n al restablecer el stock.
           </span>
         </label>
       )}
@@ -634,21 +644,21 @@ export default function ProductsPage() {
           onClick={() => setSection("sale")}
           className={`min-h-11 border-b-2 px-4 text-sm font-semibold ${section === "sale" ? "border-[var(--blue-main)] text-[var(--blue-main)]" : "border-transparent text-[var(--muted)]"}`}
         >
-          Cafetería
+          Cafeterï¿½a
         </button>
         <button
           type="button"
           onClick={() => setSection("insumos")}
           className={`min-h-11 border-b-2 px-4 text-sm font-semibold ${section === "insumos" ? "border-[var(--blue-main)] text-[var(--blue-main)]" : "border-transparent text-[var(--muted)]"}`}
         >
-          Gosén · Insumos
+          Gosï¿½n ï¿½ Insumos
         </button>
         <button
           type="button"
           onClick={() => setSection("desechables")}
           className={`min-h-11 border-b-2 px-4 text-sm font-semibold ${section === "desechables" ? "border-[var(--blue-main)] text-[var(--blue-main)]" : "border-transparent text-[var(--muted)]"}`}
         >
-          Gosén · Desechables
+          Gosï¿½n ï¿½ Desechables
         </button>
         <button
           type="button"
@@ -657,12 +667,19 @@ export default function ProductsPage() {
         >
           Gosen Limpieza
         </button>
+        <button
+          type="button"
+          onClick={() => setSection("started")}
+          className={`min-h-11 border-b-2 px-4 text-sm font-semibold ${section === "started" ? "border-[var(--blue-main)] text-[var(--blue-main)]" : "border-transparent text-[var(--muted)]"}`}
+        >
+          Productos comenzados
+        </button>
       </div>
 
       {section !== "sale" && (
         <div className="mt-6 grid gap-px border border-[var(--line)] bg-[var(--line)] sm:grid-cols-2">
           <div className="bg-white p-5">
-            <p className="text-sm text-[var(--muted)]">Artículos</p>
+            <p className="text-sm text-[var(--muted)]">Artï¿½culos</p>
             <strong className="mt-2 block text-2xl">{stockMetrics.productCount}</strong>
           </div>
           <div className="bg-white p-5">
@@ -683,20 +700,20 @@ export default function ProductsPage() {
             className="min-h-11 w-full border border-[var(--line)] pl-10 pr-4"
           />
         </label>
-        <button
+        {section !== "started" && <button
           type="button"
           onClick={openCreate}
           className="inline-flex min-h-11 items-center justify-center gap-2 bg-[var(--blue-main)] px-4 text-sm font-semibold text-white"
         >
-          <Plus size={17} /> {section === "sale" ? "Nuevo producto" : "Añadir artículo"}
-        </button>
+          <Plus size={17} /> {section === "sale" ? "Nuevo producto" : "Aï¿½adir artï¿½culo"}
+        </button>}
       </div>
 
       {showForm && (
         <form onSubmit={saveProduct} className="mt-6 border border-[var(--blue-secondary)] bg-white p-6">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">
-              {editing ? "Editar producto" : section === "sale" ? "Crear producto" : `Añadir ${section === "desechables" ? "desechable" : section === "limpieza" ? "producto de limpieza" : "insumo"}`}
+              {editing ? "Editar producto" : section === "sale" ? "Crear producto" : `Aï¿½adir ${section === "desechables" ? "desechable" : section === "limpieza" ? "producto de limpieza" : "insumo"}`}
             </h2>
             <button type="button" onClick={() => setShowForm(false)} aria-label="Cerrar formulario">
               <X size={19} />
@@ -717,24 +734,24 @@ export default function ProductsPage() {
             {section === "sale" && (
               <>
                 <label className="text-sm font-semibold">
-                  Categoría
+                  Categorï¿½a
                   <select
                     required
                     value={categorySelection}
                     onChange={(event) => setCategorySelection(event.target.value)}
                     className="mt-2 min-h-11 w-full border border-[var(--line)] bg-white px-3 font-normal"
                   >
-                    <option value="">Selecciona una categoría</option>
+                    <option value="">Selecciona una categorï¿½a</option>
                     {categories.map((category) => (
                       <option key={category.id} value={category.id}>{category.name}</option>
                     ))}
-                    <option value="new">+ Crear nueva categoría</option>
+                    <option value="new">+ Crear nueva categorï¿½a</option>
                   </select>
                 </label>
 
                 {categorySelection === "new" && (
                   <label className="text-sm font-semibold">
-                    Nueva categoría
+                    Nueva categorï¿½a
                     <input
                       required
                       value={newCategoryName}
@@ -781,7 +798,7 @@ export default function ProductsPage() {
                     <input
                       required
                       min="0"
-                      step="1"
+                      step={unit === "UNIT" ? "1" : "0.001"}
                       type="number"
                       value={stock}
                       onChange={(event) => setStock(event.target.value)}
@@ -805,26 +822,36 @@ export default function ProductsPage() {
               </>
             )}
 
-            {section === "sale" && (
-              <label className="text-sm font-semibold sm:col-span-2">
-                Imagen opcional
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={(event) => setImage(event.target.files?.[0] ?? null)}
-                  className="mt-2 block min-h-11 w-full border border-[var(--line)] bg-white px-3 py-2 text-sm font-normal file:mr-3 file:rounded-none file:border-0 file:bg-[var(--blue-light)] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-[var(--blue-main)]"
-                />
-              </label>
-            )}
+            <label className="text-sm font-semibold sm:col-span-2">
+              Imagen opcional
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(event) => setImage(event.target.files?.[0] ?? null)}
+                className="mt-2 block min-h-11 w-full border border-[var(--line)] bg-white px-3 py-2 text-sm font-normal file:mr-3 file:rounded-none file:border-0 file:bg-[var(--blue-light)] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-[var(--blue-main)]"
+              />
+            </label>
 
             {section !== "sale" && (
               <>
+                <label className="text-sm font-semibold">
+                  Se mide en
+                  <select
+                    value={unit}
+                    onChange={(event) => setUnit(event.target.value as Product["unit"])}
+                    className="mt-2 min-h-11 w-full border border-[var(--line)] bg-white px-3 font-normal"
+                  >
+                    <option value="UNIT">Unidad</option>
+                    <option value="KG">Kilogramos (kg)</option>
+                    <option value="ML">Mililitros (ml)</option>
+                  </select>
+                </label>
                 <label className="text-sm font-semibold">
                   Cantidad
                   <input
                     required
                     min="0"
-                    step="1"
+                    step={unit === "UNIT" ? "1" : "0.001"}
                     type="number"
                     value={stock}
                     onChange={(event) => setStock(event.target.value)}
@@ -878,7 +905,7 @@ export default function ProductsPage() {
                 )}
                 <div className="min-w-0">
                   <h3 className="truncate text-base font-semibold">{product.name}</h3>
-                  <p className="text-xs text-[var(--muted)]">{section === "sale" ? `Categoría #${product.category_id}` : section === "desechables" ? "Desechable" : section === "limpieza" ? "Gosen Limpieza" : "Insumo"}</p>
+                  <p className="text-xs text-[var(--muted)]">{section === "sale" ? `Categorï¿½a #${product.category_id}` : section === "desechables" ? "Desechable" : section === "limpieza" ? "Gosen Limpieza" : "Insumo"}</p>
                 </div>
               </div>
               <span className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${product.is_active ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-600"}`}>
@@ -893,10 +920,10 @@ export default function ProductsPage() {
               </div>
               <div className="border border-[var(--line)] bg-slate-50 p-3">
                 <p className="text-[11px] uppercase tracking-wide text-[var(--muted)]">Stock</p>
-                <strong className="mt-1 block text-sm">{product.stock}</strong>
+                <strong className="mt-1 block text-sm">{product.unit === "UNIT" ? wholeNumber(product.stock) : Number(product.stock).toFixed(3).replace(/\.000$/, "")} {unitLabels[product.unit ?? "UNIT"]}</strong>
               </div>
               <div className="border border-[var(--line)] bg-slate-50 p-3">
-                <p className="text-[11px] uppercase tracking-wide text-[var(--muted)]">Reposición</p>
+                <p className="text-[11px] uppercase tracking-wide text-[var(--muted)]">Reposiciï¿½n</p>
                 <strong className="mt-1 block text-sm">+{product.restock_quantity}</strong>
               </div>
             </div>
@@ -917,7 +944,7 @@ export default function ProductsPage() {
               >
                 {product.is_active ? "Deshabilitar" : "Habilitar"}
               </button>
-              {section !== "sale" ? (
+              {section !== "sale" && section !== "started" ? (
                 <button
                   type="button"
                   onClick={() => openPurchaseDialog(product)}
@@ -925,22 +952,21 @@ export default function ProductsPage() {
                 >
                   Comprar
                 </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => openTakeDialog(product)}
-                  className="min-h-9 bg-[var(--blue-main)] px-3 text-xs font-semibold text-white"
-                >
-                  Tomar
-                </button>
-              )}
+              ) : null}
+              {section !== "sale" && <button
+                type="button"
+                onClick={() => openTakeDialog(product)}
+                className="min-h-9 bg-[var(--blue-main)] px-3 text-xs font-semibold text-white"
+              >
+                Usar
+              </button>}
               <button
                 type="button"
                 disabled={Number(product.stock) <= 0 || saving}
                 onClick={() => openDamageDialog(product)}
                 className="inline-flex min-h-9 items-center gap-2 border border-red-200 bg-red-50 px-3 text-xs font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <PackageX size={14} /> Reportar daño
+                <PackageX size={14} /> Reportar daï¿½o
               </button>
               <button
                 type="button"
@@ -980,7 +1006,7 @@ export default function ProductsPage() {
               <input
                 required
                 min="1"
-                step="1"
+                  step={purchaseTarget?.unit === "UNIT" ? "1" : "0.001"}
                 type="number"
                 value={purchaseQuantity}
                 onChange={(event) => setPurchaseQuantity(event.target.value)}
@@ -1002,7 +1028,7 @@ export default function ProductsPage() {
             </label>
 
             <label className="mt-4 block text-sm font-semibold">
-              Método de pago
+              Mï¿½todo de pago
               <select
                 value={purchaseMethod}
                 onChange={(event) => setPurchaseMethod(event.target.value as "CASH" | "NEQUI")}
@@ -1014,7 +1040,7 @@ export default function ProductsPage() {
             </label>
 
             <label className="mt-4 block text-sm font-semibold">
-              Observación
+              Observaciï¿½n
               <textarea
                 value={purchaseObservation}
                 onChange={(event) => setPurchaseObservation(event.target.value)}
@@ -1040,28 +1066,28 @@ export default function ProductsPage() {
           <form onSubmit={reportDamage} className="w-full max-w-md border border-red-200 bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-red-700">Pérdida de inventario</p>
-                <h2 className="mt-1 text-lg font-semibold">Reportar daño: {damageTarget.name}</h2>
+                <p className="text-sm text-red-700">Pï¿½rdida de inventario</p>
+                <h2 className="mt-1 text-lg font-semibold">Reportar daï¿½o: {damageTarget.name}</h2>
               </div>
-              <button type="button" onClick={() => setDamageTarget(null)} aria-label="Cerrar reporte de daño">
+              <button type="button" onClick={() => setDamageTarget(null)} aria-label="Cerrar reporte de daï¿½o">
                 <X size={19} />
               </button>
             </div>
 
             <label className="mt-5 block text-sm font-semibold">
               Cantidad disponible: {damageTarget.stock}
-              <input required min="1" max={Number(damageTarget.stock)} step="1" type="number" value={damageQuantity} onChange={(event) => setDamageQuantity(event.target.value)} className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal" />
+              <input required min="0.001" max={Number(damageTarget.stock)} step={damageTarget.unit === "UNIT" ? "1" : "0.001"} type="number" value={damageQuantity} onChange={(event) => setDamageQuantity(event.target.value)} className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal" />
             </label>
 
             <label className="mt-4 block text-sm font-semibold">
-              Motivo del daño
+              Motivo del daï¿½o
               <textarea required minLength={2} maxLength={500} value={damageObservation} onChange={(event) => setDamageObservation(event.target.value)} rows={3} className="mt-2 w-full border border-[var(--line)] px-3 py-2 font-normal" />
             </label>
-            <p className="mt-3 text-xs leading-5 text-[var(--muted)]">Se descontará el stock y se registrará un egreso por el costo de adquisición del producto.</p>
+            <p className="mt-3 text-xs leading-5 text-[var(--muted)]">Se descontarï¿½ el stock y se registrarï¿½ un egreso por el costo de adquisiciï¿½n del producto.</p>
 
             <div className="mt-6 flex justify-end gap-3">
               <button type="button" onClick={() => setDamageTarget(null)} className="min-h-11 border border-[var(--line)] px-4 text-sm font-semibold">Cancelar</button>
-              <button disabled={saving} className="inline-flex min-h-11 items-center gap-2 bg-red-700 px-4 text-sm font-semibold text-white disabled:opacity-60"><PackageX size={16} /> {saving ? "Registrando..." : "Registrar daño"}</button>
+              <button disabled={saving} className="inline-flex min-h-11 items-center gap-2 bg-red-700 px-4 text-sm font-semibold text-white disabled:opacity-60"><PackageX size={16} /> {saving ? "Registrando..." : "Registrar daï¿½o"}</button>
             </div>
           </form>
         </div>
@@ -1080,37 +1106,27 @@ export default function ProductsPage() {
               </button>
             </div>
 
-            <label className="mt-5 block text-sm font-semibold">
-              Vendedora responsable
-              <select
-                required
-                value={takeSellerId}
-                onChange={(event) => setTakeSellerId(event.target.value)}
-                className="mt-2 min-h-11 w-full border border-[var(--line)] bg-white px-3 font-normal"
-              >
-                <option value="">Selecciona una vendedora</option>
-                {sellers.map((seller) => (
-                  <option key={seller.id} value={seller.id}>{seller.full_name}</option>
-                ))}
-              </select>
+            <label className="mt-5 flex items-center gap-3 text-sm font-semibold">
+              <input type="checkbox" checked={takeAll} onChange={(event) => setTakeAll(event.target.checked)} />
+              ¿Te gastaste todo el producto?
             </label>
 
-            <label className="mt-4 block text-sm font-semibold">
-              Cantidad disponible: {takeTarget.stock}
+            {!takeAll && <label className="mt-4 block text-sm font-semibold">
+              Cantidad gastada ({unitLabels[takeTarget.unit ?? "UNIT"]})
               <input
                 required
                 min="0.001"
                 max={Number(takeTarget.stock)}
-                step="0.001"
+                step={takeTarget.unit === "UNIT" ? "1" : "0.001"}
                 type="number"
                 value={takeQuantity}
                 onChange={(event) => setTakeQuantity(event.target.value)}
                 className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal"
               />
-            </label>
+            </label>}
 
             <label className="mt-4 block text-sm font-semibold">
-              Observación
+              Observaciï¿½n
               <textarea
                 value={takeObservation}
                 onChange={(event) => setTakeObservation(event.target.value)}
@@ -1124,7 +1140,7 @@ export default function ProductsPage() {
                 Cancelar
               </button>
               <button disabled={saving} className="min-h-11 bg-[var(--blue-main)] px-4 text-sm font-semibold text-white disabled:opacity-60">
-                {saving ? "Registrando..." : "Registrar toma"}
+                {saving ? "Registrando..." : "Usar producto"}
               </button>
             </div>
           </form>
@@ -1136,15 +1152,16 @@ export default function ProductsPage() {
           <section role="dialog" aria-modal="true" aria-labelledby="disabled-products-title" className="w-full max-w-2xl border border-[var(--line)] bg-white p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4 border-b border-[var(--line)] pb-4">
               <div>
-                <p className="text-sm text-[var(--muted)]">Administración</p>
+                <p className="text-sm text-[var(--muted)]">Administraciï¿½n</p>
                 <h2 id="disabled-products-title" className="mt-1 text-lg font-semibold">Productos deshabilitados</h2>
               </div>
               <button type="button" onClick={() => setDisabledModalOpen(false)} aria-label="Cerrar productos deshabilitados"><X size={19} /></button>
             </div>
-            {disabledLoading ? <p className="p-8 text-center text-sm text-[var(--muted)]">Cargando productos...</p> : disabledProducts.length === 0 ? <p className="p-8 text-center text-sm text-[var(--muted)]">No hay productos deshabilitados.</p> : <div className="mt-4 divide-y divide-[var(--line)]">{disabledProducts.map((product) => <div key={product.id} className="flex items-center justify-between gap-4 py-4"><div><strong>{product.name}</strong><p className="mt-1 text-xs text-[var(--muted)]">Stock: {product.stock} · {product.is_saleable ? "Cafetería" : "Inventario interno"}</p></div><button type="button" disabled={saving} onClick={() => void enableProduct(product)} className="inline-flex min-h-10 items-center gap-2 bg-[var(--blue-main)] px-4 text-sm font-semibold text-white disabled:opacity-60"><ArchiveRestore size={15} /> Habilitar</button></div>)}</div>}
+            {disabledLoading ? <p className="p-8 text-center text-sm text-[var(--muted)]">Cargando productos...</p> : disabledProducts.length === 0 ? <p className="p-8 text-center text-sm text-[var(--muted)]">No hay productos deshabilitados.</p> : <div className="mt-4 divide-y divide-[var(--line)]">{disabledProducts.map((product) => <div key={product.id} className="flex items-center justify-between gap-4 py-4"><div><strong>{product.name}</strong><p className="mt-1 text-xs text-[var(--muted)]">Stock: {product.stock} ï¿½ {product.is_saleable ? "Cafeterï¿½a" : "Inventario interno"}</p></div><button type="button" disabled={saving} onClick={() => void enableProduct(product)} className="inline-flex min-h-10 items-center gap-2 bg-[var(--blue-main)] px-4 text-sm font-semibold text-white disabled:opacity-60"><ArchiveRestore size={15} /> Habilitar</button></div>)}</div>}
           </section>
         </div>
       )}
     </AdminPage>
   );
 }
+

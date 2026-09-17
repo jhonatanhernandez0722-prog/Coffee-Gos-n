@@ -1,17 +1,28 @@
 "use client";
 
-import { ChangeEvent, useState } from "react";
+import { ChangeEvent, useEffect, useState } from "react";
 import Image from "next/image";
 import { ImagePlus, QrCode, Trash2, Upload } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
 
-const storageKey = "coffee_gosen_payment_qr";
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "https://backend-lemon-five-80.vercel.app/api/v1" : "http://localhost:8001/api/v1");
 
 export default function PaymentQrPage() {
-  const [qrImage, setQrImage] = useState(() => typeof window === "undefined" ? "" : localStorage.getItem(storageKey) ?? "");
+  const [qrImage, setQrImage] = useState("");
   const [error, setError] = useState("");
 
-  function handleUpload(event: ChangeEvent<HTMLInputElement>) {
+  useEffect(() => {
+    const token = sessionStorage.getItem("coffee_gosen_access_token");
+    fetch(`${apiUrl}/settings/payment-qr`, { headers: token ? { Authorization: `Bearer ${token}` } : undefined })
+      .then(async (response) => {
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail ?? "No fue posible cargar el QR.");
+        setQrImage(result.image_data ?? "");
+      })
+      .catch((requestError: Error) => setError(requestError.message));
+  }, []);
+
+  async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
     setError("");
@@ -23,20 +34,30 @@ export default function PaymentQrPage() {
       setError("La imagen no puede superar 5 MB.");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = typeof reader.result === "string" ? reader.result : "";
-      if (!result) return;
-      localStorage.setItem(storageKey, result);
-      setQrImage(result);
-    };
-    reader.readAsDataURL(file);
+    const token = sessionStorage.getItem("coffee_gosen_access_token");
+    const formData = new FormData();
+    formData.append("image", file);
+    const response = await fetch(`${apiUrl}/settings/payment-qr`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      body: formData,
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      setError(result.detail ?? "No fue posible guardar el QR.");
+      return;
+    }
+    setQrImage(result.image_data ?? "");
     event.target.value = "";
   }
 
-  function removeQr() {
-    localStorage.removeItem(storageKey);
-    setQrImage("");
+  async function removeQr() {
+    const token = sessionStorage.getItem("coffee_gosen_access_token");
+    const response = await fetch(`${apiUrl}/settings/payment-qr`, {
+      method: "DELETE",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+    if (response.ok) setQrImage("");
   }
 
   return (
@@ -48,7 +69,7 @@ export default function PaymentQrPage() {
           </span>
           <div>
             <h2 className="text-lg font-semibold">Código QR de cobro</h2>
-            <p className="mt-1 text-sm leading-6 text-[var(--muted)]">La imagen queda disponible en este navegador para mostrarla durante el cobro.</p>
+            <p className="mt-1 text-sm leading-6 text-[var(--muted)]">La imagen queda guardada en el sistema para mostrarla durante el cobro desde cualquier dispositivo.</p>
           </div>
         </div>
 

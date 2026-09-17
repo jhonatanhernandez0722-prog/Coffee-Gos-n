@@ -2,13 +2,13 @@ from datetime import datetime, time, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.v1.dependencies import require_admin
 from app.core.permissions import require_section
 from app.db.session import get_db
-from app.models import Credit, Customer, FinancialMovement, Sale, User
+from app.models import FinancialMovement, User
 from app.schemas.incomes import IncomeCreate, IncomeResponse, IncomesResponse
 
 router = APIRouter(prefix="/incomes", tags=["incomes"])
@@ -32,6 +32,7 @@ def independent_filters() -> list[object]:
         FinancialMovement.movement_type == "INCOME",
         FinancialMovement.sale_id.is_(None),
         FinancialMovement.income_type.is_not(None),
+        FinancialMovement.income_type != "OPENING_BALANCE",
     ]
 
 
@@ -88,33 +89,6 @@ def update_income(income_id: int, payload: IncomeCreate, database: Session = Dep
     database.commit()
     database.refresh(movement)
     return response_for(movement)
-
-
-@router.delete("/cleanup", status_code=status.HTTP_200_OK)
-def cleanup_income_credit_customer_data(database: Session = Depends(get_db), current_user: User = Depends(require_admin)) -> dict[str, int]:
-    independent_incomes = database.scalars(independent_statement()).all()
-    preserved_by_method: dict[str, Decimal] = {}
-    for movement in independent_incomes:
-        method = movement.payment_method or "CASH"
-        preserved_by_method[method] = preserved_by_method.get(method, Decimal("0")) + movement.amount
-
-    credit_count = database.query(Credit).count()
-    customer_count = database.query(Customer).count()
-    database.execute(delete(Credit))
-    database.execute(update(Sale).where(Sale.customer_id.is_not(None)).values(customer_id=None))
-    database.execute(delete(Customer))
-    for movement in independent_incomes:
-        database.delete(movement)
-    for payment_method, amount in preserved_by_method.items():
-        database.add(FinancialMovement(
-            user_id=current_user.id,
-            movement_type="INCOME",
-            amount=amount,
-            concept="Saldo conservado al limpiar ingresos",
-            payment_method=payment_method,
-        ))
-    database.commit()
-    return {"incomes_deleted": len(independent_incomes), "credits_deleted": credit_count, "customers_deleted": customer_count}
 
 
 @router.delete("/{income_id}", status_code=status.HTTP_204_NO_CONTENT)

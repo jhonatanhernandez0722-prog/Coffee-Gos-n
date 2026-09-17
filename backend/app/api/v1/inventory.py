@@ -10,6 +10,7 @@ from app.core.permissions import require_section
 from app.db.session import get_db
 from app.models import ExpenseCategory, FinancialMovement, InventoryMovement, Product, User
 from app.schemas.inventory import DamageCreate, InternalUseCreate, InventorySummary, PurchaseCreate
+from app.schemas.catalog import ProductResponse
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 
@@ -62,7 +63,7 @@ def register_purchase(
     return {
         "movement_id": movement.id,
         "product_id": product.id,
-        "stock_after": int(product.stock),
+        "stock_after": float(product.stock),
         "movement_type": "PURCHASE",
         "expense_amount": float(expense_amount),
     }
@@ -79,14 +80,11 @@ def register_internal_use(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only active products can be taken internally")
     if product.stock < payload.quantity:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Insufficient stock for {product.name}")
-    seller = database.scalar(select(User).where(User.id == payload.assigned_seller_id, User.role == "SELLER", User.is_active.is_(True)))
-    if seller is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La vendedora seleccionada no está disponible")
     product.stock -= payload.quantity
-    movement = InventoryMovement(product_id=product.id, user_id=current_user.id, assigned_seller_id=seller.id, movement_type="INTERNAL_USE", quantity=payload.quantity, stock_after=product.stock, observation=payload.observation)
+    movement = InventoryMovement(product_id=product.id, user_id=current_user.id, assigned_seller_id=payload.assigned_seller_id, movement_type="INTERNAL_USE", quantity=payload.quantity, stock_after=product.stock, observation=payload.observation)
     database.add(movement)
     database.commit()
-    return {"movement_id": movement.id, "product_id": product.id, "stock_after": int(product.stock), "movement_type": "INTERNAL_USE"}
+    return {"movement_id": movement.id, "product_id": product.id, "stock_after": float(product.stock), "movement_type": "INTERNAL_USE"}
 
 
 @router.post("/damage")
@@ -134,10 +132,32 @@ def register_damage(
     return {
         "movement_id": movement.id,
         "product_id": product.id,
-        "stock_after": int(product.stock),
+        "stock_after": float(product.stock),
         "movement_type": "DAMAGE",
         "expense_amount": float(loss_amount),
     }
+
+
+@router.get("/started", response_model=list[ProductResponse])
+def started_products(
+    database: Session = Depends(get_db),
+    _: User = Depends(require_section("productos")),
+) -> list[Product]:
+    return list(database.scalars(
+        select(Product)
+        .where(
+            Product.is_saleable.is_(False),
+            Product.is_active.is_(True),
+            Product.stock > 0,
+            select(InventoryMovement.id)
+            .where(
+                InventoryMovement.product_id == Product.id,
+                InventoryMovement.movement_type == "INTERNAL_USE",
+            )
+            .exists(),
+        )
+        .order_by(Product.name)
+    ))
 
 
 @router.get("/aseo-summary", response_model=InventorySummary)

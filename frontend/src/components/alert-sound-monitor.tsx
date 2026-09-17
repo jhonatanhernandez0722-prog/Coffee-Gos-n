@@ -7,13 +7,44 @@ const bellSoundStorageKey = "coffee_gosen_bell_sound_enabled";
 const bellSoundPath = "/Campana%20Tibetana%20Mini.mp3";
 const alertPollInterval = 1000;
 
-type AlertItem = { id: string };
+type AlertItem = { id: string; created_at?: string | null };
 type AlertsResponse = { alerts: AlertItem[] };
 
+type EnhancedAudioElement = HTMLAudioElement & {
+  __coffeeBellGain?: GainNode;
+  __coffeeBellContext?: AudioContext;
+};
+
+function ensureMaxVolume(audio: EnhancedAudioElement) {
+  const AudioContextCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextCtor) {
+    audio.volume = 1;
+    return;
+  }
+
+  if (!audio.__coffeeBellContext || !audio.__coffeeBellGain) {
+    const context = new AudioContextCtor();
+    const source = context.createMediaElementSource(audio);
+    const gainNode = context.createGain();
+    gainNode.gain.value = 3.5;
+    source.connect(gainNode);
+    gainNode.connect(context.destination);
+    audio.__coffeeBellContext = context;
+    audio.__coffeeBellGain = gainNode;
+  }
+
+  audio.volume = 1;
+  if (audio.__coffeeBellContext.state === "suspended") {
+    void audio.__coffeeBellContext.resume();
+  }
+}
+
 function playBellSegment(audio: HTMLAudioElement, toneRate: number) {
+  const enhancedAudio = audio as EnhancedAudioElement;
+  ensureMaxVolume(enhancedAudio);
   const play = () => {
-    const segmentLength = Math.min(2.4, audio.duration);
-    const maxStart = Math.max(0, audio.duration - segmentLength);
+    const segmentLength = Math.min(2.4, audio.duration || 0.6);
+    const maxStart = Math.max(0, (audio.duration || 0.6) - segmentLength);
     audio.currentTime = Math.random() * maxStart;
     audio.playbackRate = toneRate;
     audio.volume = 1;
@@ -80,12 +111,13 @@ export function AlertSoundMonitor() {
         });
         if (!response.ok || !isCurrent) return;
         const result = await response.json() as AlertsResponse;
-        const currentAlertIds = new Set(result.alerts.map((alert) => alert.id));
+        const eventAlerts = result.alerts.filter((alert) => alert.created_at);
+        const currentAlertIds = new Set(eventAlerts.map((alert) => alert.id));
         if (knownAlertIds.current === null) {
           knownAlertIds.current = currentAlertIds;
           return;
         }
-        const hasNewAlert = result.alerts.some((alert) => !knownAlertIds.current?.has(alert.id));
+        const hasNewAlert = eventAlerts.some((alert) => !knownAlertIds.current?.has(alert.id));
         knownAlertIds.current = currentAlertIds;
         if (hasNewAlert && window.localStorage.getItem(bellSoundStorageKey) !== "false") {
           const audio = audioRef.current;

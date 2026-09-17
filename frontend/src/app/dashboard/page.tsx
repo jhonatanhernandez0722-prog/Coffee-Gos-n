@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,
   BarChart3,
@@ -219,6 +219,8 @@ export default function DashboardPage() {
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [unreadAlerts, setUnreadAlerts] = useState(0);
   const [alertsOpen, setAlertsOpen] = useState(false);
+  const knownAlertIds = useRef<Set<string> | null>(null);
+  const unreadEventIds = useRef(new Set<string>());
   const [menuOpen, setMenuOpen] = useState(false);
   const [monthlyReport, setMonthlyReport] = useState<MonthlyReport | null>(
     null,
@@ -310,8 +312,24 @@ export default function DashboardPage() {
         alerts: AlertItem[];
         unread_count: number;
       };
+      const eventAlerts = result.alerts.filter((alert) => alert.created_at !== null);
+      const currentEventIds = new Set(eventAlerts.map((alert) => alert.id));
+      if (knownAlertIds.current === null) {
+        knownAlertIds.current = currentEventIds;
+        unreadEventIds.current.clear();
+      } else {
+        for (const alert of eventAlerts) {
+          if (!knownAlertIds.current.has(alert.id)) {
+            unreadEventIds.current.add(alert.id);
+          }
+        }
+        for (const alertId of unreadEventIds.current) {
+          if (!currentEventIds.has(alertId)) unreadEventIds.current.delete(alertId);
+        }
+        knownAlertIds.current = currentEventIds;
+      }
       setAlerts(result.alerts);
-      setUnreadAlerts(result.unread_count);
+      setUnreadAlerts(unreadEventIds.current.size);
     };
     void loadAlerts();
     const interval = window.setInterval(() => {
@@ -336,7 +354,10 @@ export default function DashboardPage() {
       },
       body: JSON.stringify({ alert_ids: alerts.map((alert) => alert.id) }),
     });
-    if (response.ok) setUnreadAlerts(0);
+    if (response.ok) {
+      unreadEventIds.current.clear();
+      setUnreadAlerts(0);
+    }
   }
 
   const balanceMetric: DashboardMetric | null = summary

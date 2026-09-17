@@ -74,6 +74,14 @@ class AlertRead(Base):
     read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class AppSetting(Base):
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    value: Mapped[str] = mapped_column(Text())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class Category(Base):
     __tablename__ = "categories"
 
@@ -93,6 +101,7 @@ class Product(Base):
     name: Mapped[str] = mapped_column(String(150), index=True)
     description: Mapped[Optional[str]] = mapped_column(Text())
     image_url: Mapped[Optional[str]] = mapped_column(String(500))
+    unit: Mapped[str] = mapped_column(String(20), default="UNIT", server_default="UNIT")
     is_saleable: Mapped[bool] = mapped_column(Boolean, default=True)
     sale_price: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     acquisition_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2))
