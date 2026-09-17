@@ -316,7 +316,7 @@ export default function DashboardPage() {
     void loadAlerts();
     const interval = window.setInterval(() => {
       if (document.visibilityState === "visible") void loadAlerts();
-    }, 60000);
+    }, 1000);
     return () => {
       isCurrent = false;
       window.clearInterval(interval);

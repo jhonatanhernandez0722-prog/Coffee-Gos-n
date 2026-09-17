@@ -181,7 +181,7 @@ def monthly_report(
 @router.get("/alerts", response_model=AlertsResponse)
 def dashboard_alerts(
     database: Session = Depends(get_db),
-    current_user: User = Depends(require_section("dashboard")),
+    current_user: User = Depends(get_current_user),
 ) -> AlertsResponse:
     alerts: list[AlertItem] = []
     low_stock_products = database.scalars(
@@ -241,7 +241,7 @@ def dashboard_alerts(
 def mark_alerts_read(
     request: AlertReadRequest,
     database: Session = Depends(get_db),
-    current_user: User = Depends(require_section("dashboard")),
+    current_user: User = Depends(get_current_user),
 ) -> None:
     existing_alert_ids = set(database.scalars(select(AlertRead.alert_id).where(AlertRead.user_id == current_user.id, AlertRead.alert_id.in_(request.alert_ids))).all()) if request.alert_ids else set()
     for alert_id in set(request.alert_ids) - existing_alert_ids:
