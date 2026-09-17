@@ -3,11 +3,11 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Banknote, Download, ReceiptText, Trash2, X } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
+import { apiUrl } from "@/lib/api";
 import { downloadExcel } from "@/lib/excel";
 
 type Category = { id: number; name: string; is_active: boolean };
 type Expense = { id: number; amount: number; payment_method: "CASH" | "NEQUI"; category_name: string; product: string | null; observation: string; created_at: string; settled_at: string | null };
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "https://backend-lemon-five-80.vercel.app/api/v1" : "http://localhost:8001/api/v1");
 const money = (value: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(value);
 
 export default function ExpensesPage() {

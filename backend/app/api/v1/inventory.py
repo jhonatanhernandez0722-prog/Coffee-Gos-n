@@ -24,8 +24,8 @@ def register_purchase(
     product = database.scalar(select(Product).where(Product.id == payload.product_id).with_for_update())
     if product is None or not product.is_active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Solo se pueden comprar productos activos")
-    if product.unit == "UNIT" and payload.quantity != payload.quantity.to_integral_value():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La cantidad debe ser un número entero para productos por unidad")
+    if product.unit in {"UNIT", "PAQUETE"} and payload.quantity != payload.quantity.to_integral_value():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La cantidad debe ser un número entero para productos por unidad o paquete")
     if payload.unit_cost <= 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El costo unitario debe ser mayor a cero")
 
@@ -82,8 +82,8 @@ def register_internal_use(
     product = database.scalar(select(Product).where(Product.id == payload.product_id).with_for_update())
     if product is None or not product.is_active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only active products can be taken internally")
-    if product.unit == "UNIT" and payload.quantity != payload.quantity.to_integral_value():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La cantidad debe ser un número entero para productos por unidad")
+    if product.unit in {"UNIT", "PAQUETE"} and payload.quantity != payload.quantity.to_integral_value():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La cantidad debe ser un número entero para productos por unidad o paquete")
     if product.stock < payload.quantity:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Insufficient stock for {product.name}")
     product.stock -= payload.quantity
@@ -102,8 +102,8 @@ def register_damage(
     product = database.scalar(select(Product).where(Product.id == payload.product_id).with_for_update())
     if product is None or not product.is_active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Solo se pueden reportar daños de productos activos")
-    if product.unit == "UNIT" and payload.quantity != payload.quantity.to_integral_value():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La cantidad debe ser un número entero para productos por unidad")
+    if product.unit in {"UNIT", "PAQUETE"} and payload.quantity != payload.quantity.to_integral_value():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La cantidad debe ser un número entero para productos por unidad o paquete")
     if product.stock < payload.quantity:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Stock insuficiente para {product.name}")
 

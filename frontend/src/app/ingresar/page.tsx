@@ -3,10 +3,10 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Banknote, Check, Delete, History, Pencil, Receipt, Trash2 } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
+import { apiUrl } from "@/lib/api";
 
 type IncomeType = "DONATION" | "OLD_INCOME" | "CONTRIBUTION" | "OTHER";
 type Income = { id: number; amount: number; person_name: string | null; income_type: IncomeType; payment_method: "CASH" | "NEQUI"; occurred_on: string; description: string; created_at: string };
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "https://backend-lemon-five-80.vercel.app/api/v1" : "http://localhost:8001/api/v1");
 const money = (value: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(value);
 const typeLabels: Record<IncomeType, string> = { DONATION: "Donación", OLD_INCOME: "Ingreso antiguo", CONTRIBUTION: "Aporte", OTHER: "Otro" };
 const today = () => new Date().toISOString().slice(0, 10);

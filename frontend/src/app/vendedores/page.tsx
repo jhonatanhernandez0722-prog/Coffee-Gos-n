@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
+import { apiUrl } from "@/lib/api";
 import { downloadExcel } from "@/lib/excel";
 
 type Seller = {
@@ -36,11 +37,6 @@ type PermissionKey =
   | "arqueo"
   | "balance"
   | "temas";
-const apiUrl =
-  process.env.NEXT_PUBLIC_API_URL ??
-  (process.env.NODE_ENV === "production"
-    ? "https://backend-lemon-five-80.vercel.app/api/v1"
-    : "http://localhost:8001/api/v1");
 const sections: { key: PermissionKey; label: string }[] = [
   { key: "dashboard", label: "Resumen" },
   { key: "comanda", label: "Ventas" },

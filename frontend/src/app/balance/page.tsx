@@ -3,10 +3,10 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Check, Landmark, Pencil, Plus, Trash2, Wallet, X } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
+import { apiUrl } from "@/lib/api";
 
 type Liability = { id: number; kind: "SUPPLIER" | "SERVICE" | "CHURCH_CONTRIBUTION"; description: string; amount: number; due_date: string | null; status: "PENDING" | "PAID"; created_at: string; paid_at: string | null };
 type Balance = { cash: number; bank: number; receivables: number; inventory: number; total_assets: number; liabilities: Liability[]; total_liabilities: number; equity: number; income: number; costs: number; expenses: number; profit: number };
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "https://backend-lemon-five-80.vercel.app/api/v1" : "http://localhost:8001/api/v1");
 const money = (value: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(value);
 const labels = { SUPPLIER: "Proveedor", SERVICE: "Servicio", CHURCH_CONTRIBUTION: "Donativo / Aporte Iglesia" };
 

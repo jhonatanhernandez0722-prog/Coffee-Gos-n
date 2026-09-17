@@ -4,8 +4,7 @@ import { ChangeEvent, useEffect, useState } from "react";
 import Image from "next/image";
 import { ImagePlus, QrCode, Trash2, Upload } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
-
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "https://backend-lemon-five-80.vercel.app/api/v1" : "http://localhost:8001/api/v1");
+import { apiUrl } from "@/lib/api";
 
 export default function PaymentQrPage() {
   const [qrImage, setQrImage] = useState("");

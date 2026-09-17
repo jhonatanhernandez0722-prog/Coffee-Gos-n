@@ -27,6 +27,7 @@ import {
   WalletCards,
   Volume2,
 } from "lucide-react";
+import { apiUrl } from "@/lib/api";
 import { downloadExcel } from "@/lib/excel";
 
 type DashboardSummary = {
@@ -88,11 +89,6 @@ type MonthlyReport = {
   products: MonthlyProduct[];
 };
 
-const apiUrl =
-  process.env.NEXT_PUBLIC_API_URL ??
-  (process.env.NODE_ENV === "production"
-    ? "https://backend-lemon-five-80.vercel.app/api/v1"
-    : "http://localhost:8001/api/v1");
 const navigation = [
   {
     label: "Resumen",

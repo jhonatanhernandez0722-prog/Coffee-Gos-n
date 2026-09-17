@@ -4,16 +4,16 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Download, Minus, Plus, Printer, Search, ShoppingBag, Trash2, X } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
+import { apiUrl } from "@/lib/api";
 import { downloadExcel } from "@/lib/excel";
 
-type Product = { id: number; name: string; sale_price: number; stock: number; unit: "KG" | "ML" | "UNIT"; content_quantity?: number | null; content_unit?: "G" | "KG" | "ML" | "L" | null; image_url?: string | null };
+type Product = { id: number; name: string; sale_price: number; stock: number; unit: "KG" | "ML" | "UNIT" | "PAQUETE"; content_quantity?: number | null; content_unit?: "G" | "KG" | "ML" | "L" | null; image_url?: string | null };
 type CartLine = Product & { quantity: number };
 type PaymentMethod = "CASH" | "NEQUI" | "CREDIT";
 type Customer = { id: number; name: string };
 type Seller = { id: number; full_name: string };
 type Receipt = { id: number; sale_number: string; total: number; payment_method: PaymentMethod; customer_name: string | null; created_at: string; items: { name: string; quantity: number; unit_price: number; line_total: number }[]; support_urls?: string[] };
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "https://backend-lemon-five-80.vercel.app/api/v1" : "http://localhost:8001/api/v1");
 const imageUrl = (path?: string | null) => {
   if (!path?.trim()) return null;
   const trimmedPath = path.trim();
@@ -29,9 +29,9 @@ const money = (value: number) => new Intl.NumberFormat("es-CO", { style: "curren
 const paymentLabel: Record<PaymentMethod, string> = { CASH: "Efectivo", NEQUI: "Nequi", CREDIT: "Crédito" };
 const contentUnitLabels: Record<"G" | "KG" | "ML" | "L", string> = { G: "g", KG: "kg", ML: "ml", L: "l" };
 const formatStock = (product: Pick<Product, "stock" | "unit" | "content_quantity" | "content_unit">) => {
-  const stock = product.unit === "UNIT" ? Math.round(Number(product.stock)) : Number(product.stock).toFixed(3).replace(/\.000$/, "");
+  const stock = product.unit === "UNIT" || product.unit === "PAQUETE" ? Math.round(Number(product.stock)) : Number(product.stock).toFixed(3).replace(/\.000$/, "");
   const presentation = product.content_quantity && product.content_unit ? ` · ${Number(product.content_quantity).toString()} ${contentUnitLabels[product.content_unit]} c/u` : "";
-  return `${stock} ${product.unit === "UNIT" ? "unidad" : product.unit.toLowerCase()}${presentation}`;
+  return `${stock} ${product.unit === "UNIT" ? "unidad" : product.unit === "PAQUETE" ? "paquete" : product.unit.toLowerCase()}${presentation}`;
 };
 
 export default function ComandaPage() {
