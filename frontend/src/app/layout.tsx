@@ -5,7 +5,7 @@ import { AlertSoundMonitor } from "@/components/alert-sound-monitor";
 
 export const metadata: Metadata = {
   title: "Coffee Gosen | Gestión de ventas",
-  description: "Ventas, inventario y gestión operativa para Coffee Gosen.",
+  description: "Coffee Gosen un lugar de provision fe y sabor",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
