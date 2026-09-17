@@ -304,26 +304,30 @@ export default function DashboardPage() {
         return;
       }
       if (!response.ok || !isCurrent) return;
+
       const result = (await response.json()) as {
         alerts: AlertItem[];
         unread_count: number;
       };
       const eventAlerts = result.alerts.filter((alert) => alert.created_at !== null);
       const currentEventIds = new Set(eventAlerts.map((alert) => alert.id));
+
       if (knownAlertIds.current === null) {
         knownAlertIds.current = currentEventIds;
         unreadEventIds.current.clear();
       } else {
-        for (const alert of eventAlerts) {
-          if (!knownAlertIds.current.has(alert.id)) {
-            unreadEventIds.current.add(alert.id);
-          }
+        const newAlertIds = Array.from(currentEventIds).filter(
+          (alertId) => !knownAlertIds.current?.has(alertId),
+        );
+        for (const alertId of newAlertIds) {
+          unreadEventIds.current.add(alertId);
         }
-        for (const alertId of unreadEventIds.current) {
+        for (const alertId of Array.from(unreadEventIds.current)) {
           if (!currentEventIds.has(alertId)) unreadEventIds.current.delete(alertId);
         }
         knownAlertIds.current = currentEventIds;
       }
+
       setAlerts(result.alerts);
       setUnreadAlerts(unreadEventIds.current.size);
     };

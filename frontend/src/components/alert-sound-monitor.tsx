@@ -102,6 +102,7 @@ export function AlertSoundMonitor() {
       const token = sessionStorage.getItem("coffee_gosen_access_token");
       if (!token) {
         knownAlertIds.current = null;
+        pendingSound.current = false;
         return;
       }
 
@@ -113,12 +114,15 @@ export function AlertSoundMonitor() {
         const result = await response.json() as AlertsResponse;
         const eventAlerts = result.alerts.filter((alert) => alert.created_at);
         const currentAlertIds = new Set(eventAlerts.map((alert) => alert.id));
+
         if (knownAlertIds.current === null) {
           knownAlertIds.current = currentAlertIds;
           return;
         }
+
         const hasNewAlert = eventAlerts.some((alert) => !knownAlertIds.current?.has(alert.id));
         knownAlertIds.current = currentAlertIds;
+
         if (hasNewAlert && window.localStorage.getItem(bellSoundStorageKey) !== "false") {
           const audio = audioRef.current;
           if (audioUnlocked.current && audio) {
