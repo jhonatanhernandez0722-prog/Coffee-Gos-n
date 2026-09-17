@@ -11,6 +11,7 @@ class SaleItemCreate(BaseModel):
 class SaleCreate(BaseModel):
     customer_id: int | None = Field(default=None, gt=0)
     buyer_name: str | None = Field(default=None, max_length=150)
+    assigned_seller_id: int | None = Field(default=None, gt=0)
     payment_method: str = Field(pattern="^(CASH|NEQUI|CREDIT)$")
     items: list[SaleItemCreate] = Field(min_length=1)
 
