@@ -291,7 +291,6 @@ export default function DashboardPage() {
   }, [reportMonth]);
 
   useEffect(() => {
-    let isCurrent = true;
     const loadAlerts = async () => {
       const token = sessionStorage.getItem("coffee_gosen_access_token");
       const response = await fetch(`${apiUrl}/dashboard/alerts`, {
@@ -303,7 +302,7 @@ export default function DashboardPage() {
         router.replace("/login");
         return;
       }
-      if (!response.ok || !isCurrent) return;
+      if (!response.ok) return;
 
       const result = (await response.json()) as {
         alerts: AlertItem[];
@@ -335,13 +334,6 @@ export default function DashboardPage() {
       setUnreadAlerts(unreadEventIds.current.size);
     };
     void loadAlerts();
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") void loadAlerts();
-    }, 1000);
-    return () => {
-      isCurrent = false;
-      window.clearInterval(interval);
-    };
   }, [router]);
 
   async function openAlerts() {
