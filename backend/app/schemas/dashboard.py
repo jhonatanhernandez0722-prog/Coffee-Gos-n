@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 class MonthlyProductRow(BaseModel):
     product_name: str
-    units_sold: Decimal
+    units_sold: int
     sales_total: Decimal
     cost_total: Decimal
     profit_total: Decimal
@@ -25,7 +25,7 @@ class DashboardSummary(BaseModel):
     cost_today: Decimal
     profit_today: Decimal
     sales_today: int
-    products_sold_today: Decimal
+    products_sold_today: int
     pending_credits: Decimal
     low_stock_products: int
     products: list[MonthlyProductRow]

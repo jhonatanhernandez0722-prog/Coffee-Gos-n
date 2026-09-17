@@ -59,6 +59,8 @@ def register_purchase(
         observation=payload.observation or f"Compra de {product.name}",
     )
     database.add(financial_movement)
+    database.flush()
+    movement.financial_movement_id = financial_movement.id
 
     database.commit()
     database.refresh(product)

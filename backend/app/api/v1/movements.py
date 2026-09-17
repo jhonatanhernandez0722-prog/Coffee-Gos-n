@@ -46,6 +46,10 @@ def list_movements(
 
     inventory_sale_ids = {movement.sale_id for movement, _ in inventory_rows if movement.sale_id}
     sale_financials = {movement.sale_id: (movement, quantity) for movement, quantity in financial_rows if movement.sale_id}
+    purchase_financial_ids = {movement.financial_movement_id for movement, _ in inventory_rows if movement.financial_movement_id}
+    linked_purchase_financials = database.scalars(select(FinancialMovement).where(FinancialMovement.id.in_(purchase_financial_ids))).all() if purchase_financial_ids else []
+    financial_by_id = {movement.id: movement for movement, _ in financial_rows}
+    financial_by_id.update({movement.id: movement for movement in linked_purchase_financials})
 
     internal_seller_ids = {movement.assigned_seller_id for movement, _ in inventory_rows if movement.assigned_seller_id}
     internal_sellers = dict(database.execute(select(User.id, User.full_name).where(User.id.in_(internal_seller_ids))).all()) if internal_seller_ids else {}
@@ -92,7 +96,8 @@ def list_movements(
                 related_id=movement.sale_id,
                 product_id=movement.product_id,
                 movement_type=movement.movement_type,
-                amount=sale_financials.get(movement.sale_id, (None, None))[0].amount if movement.sale_id and sale_financials.get(movement.sale_id) else None,
+                amount=(financial_by_id.get(movement.financial_movement_id).amount if movement.financial_movement_id and financial_by_id.get(movement.financial_movement_id) else sale_financials.get(movement.sale_id, (None, None))[0].amount if movement.sale_id and sale_financials.get(movement.sale_id) else None),
+                unit_cost=(financial_by_id.get(movement.financial_movement_id).amount / movement.quantity if movement.financial_movement_id and financial_by_id.get(movement.financial_movement_id) and movement.quantity else None),
                 quantity=movement.quantity,
                 concept=movement.observation or movement.movement_type,
                 product_name=product_name,
@@ -103,7 +108,7 @@ def list_movements(
         )
 
     for movement, quantity in financial_rows:
-        if movement.sale_id in inventory_sale_ids:
+        if movement.sale_id in inventory_sale_ids or movement.id in purchase_financial_ids:
             continue
         sale_detail = sale_metadata.get(movement.sale_id, {})
         rows.append(
@@ -144,6 +149,23 @@ def update_inventory_movement(
 
     quantity = payload.quantity if payload.quantity is not None else movement.quantity
     new_product = product
+    financial_movement = database.get(FinancialMovement, movement.financial_movement_id) if movement.financial_movement_id else None
+    if financial_movement is None and movement.movement_type == "PURCHASE":
+        financial_movement = database.scalar(
+            select(FinancialMovement)
+            .where(
+                FinancialMovement.user_id == movement.user_id,
+                FinancialMovement.movement_type == "EXPENSE",
+                FinancialMovement.concept == f"Compra de {product.name}",
+                FinancialMovement.created_at >= movement.created_at - timedelta(seconds=2),
+                FinancialMovement.created_at <= movement.created_at + timedelta(seconds=2),
+            )
+            .order_by(FinancialMovement.id.desc())
+            .limit(1)
+        )
+        if financial_movement:
+            movement.financial_movement_id = financial_movement.id
+    current_unit_cost = financial_movement.amount / movement.quantity if financial_movement and movement.quantity else None
     if payload.product_id is not None and payload.product_id != movement.product_id:
         new_product = database.scalar(select(Product).where(Product.id == payload.product_id).with_for_update())
         if new_product is None or not new_product.is_active:
@@ -173,8 +195,17 @@ def update_inventory_movement(
     movement.quantity = quantity
     movement.stock_after = new_product.stock
 
+    if financial_movement:
+        unit_cost = payload.unit_cost if payload.unit_cost is not None else current_unit_cost
+        financial_movement.amount = quantity * unit_cost
+        financial_movement.concept = f"Compra de {new_product.name}"
+        financial_movement.product = new_product.name
+        financial_movement.observation = movement.observation or f"Compra de {new_product.name}"
+
     if payload.observation is not None:
         movement.observation = payload.observation.strip() or None
+        if financial_movement:
+            financial_movement.observation = movement.observation or f"Compra de {new_product.name}"
 
     if payload.assigned_seller_id is not None:
         seller = database.scalar(select(User).where(User.id == payload.assigned_seller_id, User.role == "SELLER", User.is_active.is_(True)))
@@ -198,7 +229,8 @@ def update_inventory_movement(
         related_id=movement.sale_id,
         product_id=new_product.id,
         movement_type=movement.movement_type,
-        amount=None,
+        amount=financial_movement.amount if financial_movement else None,
+        unit_cost=financial_movement.amount / movement.quantity if financial_movement and movement.quantity else None,
         quantity=movement.quantity,
         concept=movement.observation or movement.movement_type,
         product_name=new_product.name,
@@ -240,6 +272,7 @@ def update_financial_movement(
         related_id=movement.sale_id,
         movement_type=movement.movement_type,
         amount=movement.amount,
+        unit_cost=None,
         quantity=None,
         concept=movement.concept,
         product_name=None,

@@ -171,6 +171,7 @@ class InventoryMovement(Base):
     movement_type: Mapped[str] = mapped_column(String(20), index=True)
     quantity: Mapped[Decimal] = mapped_column(Numeric(12, 3))
     stock_after: Mapped[Decimal] = mapped_column(Numeric(12, 3))
+    financial_movement_id: Mapped[Optional[int]] = mapped_column(ForeignKey("financial_movements.id"), index=True)
     sale_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sales.id"))
     assigned_seller_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), index=True)
     observation: Mapped[Optional[str]] = mapped_column(Text())

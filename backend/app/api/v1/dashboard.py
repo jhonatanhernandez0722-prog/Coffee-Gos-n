@@ -117,7 +117,7 @@ def dashboard_summary(
     product_rows = [
         MonthlyProductRow(
             product_name=name,
-            units_sold=units or 0,
+            units_sold=int(units or 0),
             sales_total=sales or 0,
             cost_total=cost or 0,
             profit_total=(sales or 0) - (cost or 0),
@@ -139,7 +139,7 @@ def dashboard_summary(
         cost_today=cost_today,
         profit_today=income_today - cost_today - expenses_today,
         sales_today=sales_today,
-        products_sold_today=products_sold_today,
+        products_sold_today=int(products_sold_today),
         pending_credits=pending_credits,
         low_stock_products=low_stock_products,
         products=product_rows,
@@ -174,7 +174,7 @@ def monthly_report(
         )
     ) or Decimal("0")
     products = database.execute(select(Product.name, func.sum(SaleItem.quantity), func.sum(SaleItem.quantity * SaleItem.unit_price), func.sum(SaleItem.quantity * SaleItem.unit_cost_snapshot), func.avg(SaleItem.unit_price)).join(SaleItem, SaleItem.product_id == Product.id).join(Sale, Sale.id == SaleItem.sale_id).where(Sale.created_at >= month_start, Sale.created_at < next_month, ~select(Credit.id).where(Credit.sale_id == Sale.id, Credit.status == "PENDING").exists()).group_by(Product.name).order_by(Product.name)).all()
-    product_rows = [MonthlyProductRow(product_name=name, units_sold=units or 0, sales_total=sales or 0, cost_total=cost or 0, profit_total=(sales or 0) - (cost or 0), unit_price=price or 0) for name, units, sales, cost, price in products]
+    product_rows = [MonthlyProductRow(product_name=name, units_sold=int(units or 0), sales_total=sales or 0, cost_total=cost or 0, profit_total=(sales or 0) - (cost or 0), unit_price=price or 0) for name, units, sales, cost, price in products]
     return MonthlyReport(month=month, balance_total=balance_total, days=[value.isoformat() for value in date_list], income_by_day=[income_map.get(value, 0) for value in date_list], expenses_by_day=[expense_map.get(value, 0) for value in date_list], sales_by_day=[sales_map.get(value, 0) for value in date_list], total_income=sum(income_map.values(), Decimal("0")), total_expenses=sum(expense_map.values(), Decimal("0")), total_sales=sum(sales_map.values()), products=product_rows)
 
 
