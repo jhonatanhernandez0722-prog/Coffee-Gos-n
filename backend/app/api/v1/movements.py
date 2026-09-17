@@ -160,6 +160,9 @@ def update_inventory_movement(
             if sale_item:
                 sale_item.product_id = new_product.id
 
+    if new_product.unit == "UNIT" and quantity != quantity.to_integral_value():
+        raise HTTPException(status_code=400, detail="La cantidad debe ser un número entero para productos por unidad")
+
     delta = quantity if new_product.id != product.id else quantity - movement.quantity
     if movement.movement_type in {"SALE", "DAMAGE", "INTERNAL_USE"}:
         new_product.stock -= delta

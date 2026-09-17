@@ -62,6 +62,7 @@ const apiError = (result: { detail?: string | { msg?: string }[] }, fallback: st
     ? result.detail.map((item) => item.msg).filter(Boolean).join(". ") || fallback
     : result.detail || fallback;
 const unitLabels: Record<Product["unit"], string> = { KG: "kg", ML: "ml", UNIT: "unidad" };
+const normalizeQuantityInput = (value: string, unit: Product["unit"]) => unit === "UNIT" ? value.replace(/[^0-9]/g, "") : value;
 const formatStock = (product: Pick<Product, "stock" | "unit" | "content_quantity" | "content_unit">) => {
   const stock = product.unit === "UNIT" ? wholeNumber(product.stock) : Number(product.stock).toFixed(3).replace(/\.000$/, "");
   const presentation = product.content_quantity ? ` · ${Number(product.content_quantity).toString()} ${product.content_unit?.toLowerCase() ?? ""} c/u` : "";
@@ -168,9 +169,9 @@ export default function ProductsPage() {
     setNewCategoryName("");
     setSalePrice(String(product.sale_price));
     setCost(String(product.acquisition_cost));
-    setStock(String(product.stock));
-    setRestockQuantity(String(product.restock_quantity));
-    setUnit(product.unit ?? "UNIT");
+    setStock(product.unit === "UNIT" ? String(wholeNumber(product.stock)) : String(product.stock));
+    setRestockQuantity(product.unit === "UNIT" ? String(wholeNumber(product.restock_quantity)) : String(product.restock_quantity));
+    setUnit(section === "sale" ? "UNIT" : product.unit ?? "UNIT");
     setContentQuantity(product.content_quantity == null ? "" : String(product.content_quantity));
     setContentUnit(product.content_unit ?? "ML");
     setImage(null);
@@ -190,7 +191,7 @@ export default function ProductsPage() {
     event.preventDefault();
     if (!purchaseTarget) return;
 
-    const quantity = Number(purchaseQuantity);
+    const quantity = purchaseTarget?.unit === "UNIT" ? Math.trunc(Number(purchaseQuantity)) : Number(purchaseQuantity);
     const unitCost = Number(purchaseCost);
     if (!Number.isFinite(quantity) || quantity <= 0) {
       setError("La cantidad de compra debe ser mayor a cero.");
@@ -617,7 +618,7 @@ export default function ProductsPage() {
             step="1"
             type="number"
             value={restockQuantity}
-            onChange={(event) => setRestockQuantity(event.target.value)}
+            onChange={(event) => setRestockQuantity(normalizeQuantityInput(event.target.value, unit))}
             className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal"
           />
           <span className="mt-1 block text-xs font-normal text-[var(--muted)]">
@@ -818,7 +819,7 @@ export default function ProductsPage() {
                       step={unit === "UNIT" ? "1" : "0.001"}
                       type="number"
                       value={stock}
-                      onChange={(event) => setStock(event.target.value)}
+                      onChange={(event) => setStock(normalizeQuantityInput(event.target.value, unit === "UNIT" ? "UNIT" : unit))}
                       className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal"
                     />
                   </label>
@@ -831,7 +832,7 @@ export default function ProductsPage() {
                       step="1"
                       type="number"
                       value={stock}
-                      onChange={(event) => setStock(event.target.value)}
+                      onChange={(event) => setStock(normalizeQuantityInput(event.target.value, "UNIT"))}
                       className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal"
                     />
                   </label>
@@ -871,7 +872,7 @@ export default function ProductsPage() {
                     step={unit === "UNIT" ? "1" : "0.001"}
                     type="number"
                     value={stock}
-                    onChange={(event) => setStock(event.target.value)}
+                    onChange={(event) => setStock(normalizeQuantityInput(event.target.value, unit))}
                     className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal"
                   />
                 </label>
@@ -1038,7 +1039,7 @@ export default function ProductsPage() {
                   step={purchaseTarget?.unit === "UNIT" ? "1" : "0.001"}
                 type="number"
                 value={purchaseQuantity}
-                onChange={(event) => setPurchaseQuantity(event.target.value)}
+                onChange={(event) => setPurchaseQuantity(normalizeQuantityInput(event.target.value, purchaseTarget?.unit ?? "UNIT"))}
                 className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal"
               />
             </label>
@@ -1105,7 +1106,7 @@ export default function ProductsPage() {
 
             <label className="mt-5 block text-sm font-semibold">
               Cantidad disponible: {formatStock(damageTarget)}
-              <input required min="0.001" max={Number(damageTarget.stock)} step={damageTarget.unit === "UNIT" ? "1" : "0.001"} type="number" value={damageQuantity} onChange={(event) => setDamageQuantity(event.target.value)} className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal" />
+              <input required min={damageTarget.unit === "UNIT" ? "1" : "0.001"} max={Number(damageTarget.stock)} step={damageTarget.unit === "UNIT" ? "1" : "0.001"} type="number" value={damageQuantity} onChange={(event) => setDamageQuantity(normalizeQuantityInput(event.target.value, damageTarget.unit))} className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal" />
             </label>
 
             <label className="mt-4 block text-sm font-semibold">
@@ -1149,7 +1150,7 @@ export default function ProductsPage() {
                 step={takeTarget.unit === "UNIT" ? "1" : "0.001"}
                 type="number"
                 value={takeQuantity}
-                onChange={(event) => setTakeQuantity(event.target.value)}
+                onChange={(event) => setTakeQuantity(normalizeQuantityInput(event.target.value, takeTarget.unit))}
                 className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal"
               />
             </label>}

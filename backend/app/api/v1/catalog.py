@@ -81,6 +81,8 @@ def create_product(
     category = database.get(Category, payload.category_id)
     if category is None or not category.is_active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Active category is required")
+    if payload.unit == "UNIT" and any(value != value.to_integral_value() for value in (payload.stock, payload.low_stock_threshold, payload.restock_quantity)):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Los productos por unidad solo aceptan cantidades enteras")
     product = Product(**payload.model_dump())
     database.add(product)
     database.commit()
@@ -103,6 +105,12 @@ def update_product(
         category = database.get(Category, values["category_id"])
         if category is None or not category.is_active:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Active category is required")
+    effective_unit = values.get("unit", product.unit)
+    if effective_unit == "UNIT":
+        for field in ("stock", "low_stock_threshold", "restock_quantity"):
+            value = values.get(field, getattr(product, field))
+            if value != value.to_integral_value():
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Los productos por unidad solo aceptan cantidades enteras")
     for field, value in values.items():
         setattr(product, field, value)
     database.commit()
