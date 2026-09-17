@@ -56,6 +56,13 @@ const wholeNumber = (value: number | string | null | undefined) => {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? Math.round(parsed) : 0;
 };
+const normalizeDisplayNumber = (value: number | string | null | undefined, unit?: Product["unit"]) => {
+  if (value === null || value === undefined || value === "") return "";
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return "";
+  if (unit === "UNIT" || Number.isInteger(parsed)) return String(Math.trunc(parsed));
+  return parsed.toString().replace(/(\.\d*?[1-9])0+$/, "$1").replace(/\.0+$/, "");
+};
 
 const apiError = (result: { detail?: string | { msg?: string }[] }, fallback: string) =>
   Array.isArray(result.detail)
@@ -173,10 +180,10 @@ export default function ProductsPage() {
     setNewCategoryName("");
     setSalePrice(String(product.sale_price));
     setCost(String(product.acquisition_cost));
-    setStock(product.unit === "UNIT" ? String(wholeNumber(product.stock)) : String(product.stock));
-    setRestockQuantity(product.unit === "UNIT" ? String(wholeNumber(product.restock_quantity)) : String(product.restock_quantity));
+    setStock(product.unit === "UNIT" ? String(wholeNumber(product.stock)) : normalizeDisplayNumber(product.stock, product.unit));
+    setRestockQuantity(product.unit === "UNIT" ? String(wholeNumber(product.restock_quantity)) : normalizeDisplayNumber(product.restock_quantity, product.unit));
     setUnit(section === "sale" ? "UNIT" : product.unit ?? "UNIT");
-    setContentQuantity(product.content_quantity == null ? "" : String(product.content_quantity));
+    setContentQuantity(product.content_quantity == null ? "" : normalizeDisplayNumber(product.content_quantity));
     setContentUnit(product.content_unit ?? "ML");
     setImage(null);
     setShowForm(true);

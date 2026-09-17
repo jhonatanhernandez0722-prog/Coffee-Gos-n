@@ -23,10 +23,19 @@ type Movement = {
 type ProductOption = { id: number; name: string; unit: "KG" | "ML" | "UNIT"; content_quantity?: number | null; content_unit?: "G" | "KG" | "ML" | "L" | null };
 
 const money = (value: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(value);
+const normalizeDisplayQuantity = (value: number | string | null | undefined, unit?: ProductOption["unit"]) => {
+  if (value === null || value === undefined || value === "") return "";
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "";
+  if (unit === "UNIT" || Number.isInteger(num)) return String(Math.trunc(num));
+  return num.toString().replace(/(\.\d*?[1-9])0+$/, "$1").replace(/\.0+$/, "");
+};
 const quantityLabel = (value: number | null) => {
   if (value === null) return "-";
   const num = Number(value);
-  return Number.isInteger(num) ? String(num) : String(Number(num.toFixed(2)).toString());
+  if (!Number.isFinite(num)) return "-";
+  if (Number.isInteger(num)) return String(Math.trunc(num));
+  return num.toString().replace(/(\.\d*?[1-9])0+$/, "$1").replace(/\.0+$/, "");
 };
 const labels: Record<string, string> = { SALE: "Salida por venta", PURCHASE: "Entrada de inventario", ADJUSTMENT: "Ajuste de inventario", INTERNAL_USE: "Uso interno", DAMAGE: "Pérdida por daño", INCOME: "Ingreso", EXPENSE: "Egreso" };
 
@@ -78,9 +87,10 @@ export default function MovementsPage() {
   }, []);
 
   function openEdit(movement: Movement) {
+    const selectedProductUnit = products.find((product) => product.id === movement.product_id)?.unit;
     setEditing(movement);
     setEditProductId(movement.product_id == null ? "" : String(movement.product_id));
-    setEditQuantity(movement.quantity == null ? "" : String(movement.quantity));
+    setEditQuantity(movement.quantity == null ? "" : normalizeDisplayQuantity(movement.quantity, selectedProductUnit));
     setEditAmount(movement.amount == null ? "" : String(movement.amount));
     setEditUnitCost(movement.unit_cost == null ? "" : String(movement.unit_cost));
     setEditConcept(movement.concept || "");
