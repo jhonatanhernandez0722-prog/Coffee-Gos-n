@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useState } from "react";
 import Image from "next/image";
 import { ArchiveRestore, Download, Package, PackageX, Pencil, Plus, Search, X } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
@@ -63,6 +63,9 @@ const apiError = (result: { detail?: string | { msg?: string }[] }, fallback: st
     : result.detail || fallback;
 const unitLabels: Record<Product["unit"], string> = { KG: "kg", ML: "ml", UNIT: "unidad" };
 const normalizeQuantityInput = (value: string, unit: Product["unit"]) => unit === "UNIT" ? value.replace(/[^0-9]/g, "") : value;
+const preventDecimalKeys = (event: KeyboardEvent<HTMLInputElement>) => {
+  if ([".", ",", "e", "E", "+", "-"].includes(event.key)) event.preventDefault();
+};
 const formatStock = (product: Pick<Product, "stock" | "unit" | "content_quantity" | "content_unit">) => {
   const stock = product.unit === "UNIT" ? wholeNumber(product.stock) : Number(product.stock).toFixed(3).replace(/\.000$/, "");
   const presentation = product.content_quantity ? ` · ${Number(product.content_quantity).toString()} ${product.content_unit?.toLowerCase() ?? ""} c/u` : "";
@@ -1150,6 +1153,8 @@ export default function ProductsPage() {
                 step={takeTarget.unit === "UNIT" ? "1" : "0.001"}
                 type="number"
                 value={takeQuantity}
+                onKeyDown={takeTarget.unit === "UNIT" ? preventDecimalKeys : undefined}
+                inputMode={takeTarget.unit === "UNIT" ? "numeric" : "decimal"}
                 onChange={(event) => setTakeQuantity(normalizeQuantityInput(event.target.value, takeTarget.unit))}
                 className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal"
               />
