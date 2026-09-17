@@ -6,7 +6,7 @@ import { Download, Minus, Plus, Printer, Search, ShoppingBag, Trash2, X } from "
 import { AdminPage } from "@/components/admin-page";
 import { downloadExcel } from "@/lib/excel";
 
-type Product = { id: number; name: string; sale_price: number; stock: number; unit: "KG" | "ML" | "UNIT"; content_quantity?: number | null; content_unit?: "KG" | "ML" | null; image_url?: string | null };
+type Product = { id: number; name: string; sale_price: number; stock: number; unit: "KG" | "ML" | "UNIT"; content_quantity?: number | null; content_unit?: "G" | "KG" | "ML" | "L" | null; image_url?: string | null };
 type CartLine = Product & { quantity: number };
 type PaymentMethod = "CASH" | "NEQUI" | "CREDIT";
 type Customer = { id: number; name: string };
@@ -27,9 +27,10 @@ const readApiResponse = async (response: Response): Promise<{ detail?: string; [
 };
 const money = (value: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(value);
 const paymentLabel: Record<PaymentMethod, string> = { CASH: "Efectivo", NEQUI: "Nequi", CREDIT: "Crédito" };
+const contentUnitLabels: Record<"G" | "KG" | "ML" | "L", string> = { G: "g", KG: "kg", ML: "ml", L: "l" };
 const formatStock = (product: Pick<Product, "stock" | "unit" | "content_quantity" | "content_unit">) => {
   const stock = product.unit === "UNIT" ? Math.round(Number(product.stock)) : Number(product.stock).toFixed(3).replace(/\.000$/, "");
-  const presentation = product.content_quantity ? ` · ${Number(product.content_quantity).toString()} ${product.content_unit?.toLowerCase() ?? ""} c/u` : "";
+  const presentation = product.content_quantity && product.content_unit ? ` · ${Number(product.content_quantity).toString()} ${contentUnitLabels[product.content_unit]} c/u` : "";
   return `${stock} ${product.unit === "UNIT" ? "unidad" : product.unit.toLowerCase()}${presentation}`;
 };
 

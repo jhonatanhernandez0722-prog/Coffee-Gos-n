@@ -19,7 +19,7 @@ type Movement = {
   customer_name: string | null;
   created_at: string;
 };
-type ProductOption = { id: number; name: string; unit: "KG" | "ML" | "UNIT"; content_quantity?: number | null; content_unit?: "KG" | "ML" | null };
+type ProductOption = { id: number; name: string; unit: "KG" | "ML" | "UNIT"; content_quantity?: number | null; content_unit?: "G" | "KG" | "ML" | "L" | null };
 
 const money = (value: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(value);
 const quantityLabel = (value: number | null) => {
