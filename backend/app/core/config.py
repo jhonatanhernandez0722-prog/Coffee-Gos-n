@@ -16,6 +16,7 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
         "https://frontend-jade-phi-5kpqyple00.vercel.app",
     ]
+    cors_origin_regex: str | None = r"https://.*\.vercel\.app"
     environment: str = "development"
     allow_demo_access: bool = False
     aseo_pin: str = "2468"
