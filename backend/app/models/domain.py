@@ -102,6 +102,8 @@ class Product(Base):
     description: Mapped[Optional[str]] = mapped_column(Text())
     image_url: Mapped[Optional[str]] = mapped_column(String(500))
     unit: Mapped[str] = mapped_column(String(20), default="UNIT", server_default="UNIT")
+    content_quantity: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 3))
+    content_unit: Mapped[Optional[str]] = mapped_column(String(20))
     is_saleable: Mapped[bool] = mapped_column(Boolean, default=True)
     sale_price: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     acquisition_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2))

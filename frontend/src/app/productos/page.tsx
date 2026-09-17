@@ -18,6 +18,8 @@ type Product = {
   is_active: boolean;
   is_saleable: boolean;
   unit: "KG" | "ML" | "UNIT";
+  content_quantity?: number | null;
+  content_unit?: "KG" | "ML" | null;
   image_url?: string | null;
 };
 
@@ -60,6 +62,11 @@ const apiError = (result: { detail?: string | { msg?: string }[] }, fallback: st
     ? result.detail.map((item) => item.msg).filter(Boolean).join(". ") || fallback
     : result.detail || fallback;
 const unitLabels: Record<Product["unit"], string> = { KG: "kg", ML: "ml", UNIT: "unidad" };
+const formatStock = (product: Pick<Product, "stock" | "unit" | "content_quantity" | "content_unit">) => {
+  const stock = product.unit === "UNIT" ? wholeNumber(product.stock) : Number(product.stock).toFixed(3).replace(/\.000$/, "");
+  const presentation = product.content_quantity ? ` · ${Number(product.content_quantity).toString()} ${product.content_unit?.toLowerCase() ?? ""} c/u` : "";
+  return `${stock} ${unitLabels[product.unit ?? "UNIT"]}${presentation}`;
+};
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -77,6 +84,8 @@ export default function ProductsPage() {
   const [stock, setStock] = useState("");
   const [restockQuantity, setRestockQuantity] = useState("10");
   const [unit, setUnit] = useState<"KG" | "ML" | "UNIT">("UNIT");
+  const [contentQuantity, setContentQuantity] = useState("");
+  const [contentUnit, setContentUnit] = useState<"KG" | "ML">("ML");
   const [image, setImage] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -146,6 +155,8 @@ export default function ProductsPage() {
     setStock("");
     setRestockQuantity("10");
     setUnit("UNIT");
+    setContentQuantity("");
+    setContentUnit("ML");
     setImage(null);
     setShowForm(true);
   }
@@ -160,6 +171,8 @@ export default function ProductsPage() {
     setStock(String(product.stock));
     setRestockQuantity(String(product.restock_quantity));
     setUnit(product.unit ?? "UNIT");
+    setContentQuantity(product.content_quantity == null ? "" : String(product.content_quantity));
+    setContentUnit(product.content_unit ?? "ML");
     setImage(null);
     setShowForm(true);
   }
@@ -264,6 +277,8 @@ export default function ProductsPage() {
             category_id: categoryId,
             name: name.trim(),
             unit: section === "sale" ? "UNIT" : unit,
+            content_quantity: section === "sale" || !contentQuantity.trim() ? null : Number(contentQuantity),
+            content_unit: section === "sale" || !contentQuantity.trim() ? null : contentUnit,
             sale_price: section === "sale" ? Number(salePrice) : 0,
             acquisition_cost: Number(cost),
             stock: Number(stock),
@@ -334,6 +349,8 @@ export default function ProductsPage() {
           category_id: category.id,
           name: name.trim(),
           unit: section === "sale" ? "UNIT" : unit,
+          content_quantity: section === "sale" || !contentQuantity.trim() ? null : Number(contentQuantity),
+          content_unit: section === "sale" || !contentQuantity.trim() ? null : contentUnit,
           sale_price: section === "sale" ? Number(salePrice) : 0,
           acquisition_cost: Number(cost),
           stock: Number(stock),
@@ -860,6 +877,18 @@ export default function ProductsPage() {
                 </label>
 
                 <label className="text-sm font-semibold">
+                  Contenido por unidad (opcional)
+                  <input min="0.001" step="0.001" type="number" value={contentQuantity} onChange={(event) => setContentQuantity(event.target.value)} className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal" placeholder="Ej. 250" />
+                </label>
+                <label className="text-sm font-semibold">
+                  Unidad del contenido
+                  <select value={contentUnit} onChange={(event) => setContentUnit(event.target.value as "KG" | "ML")} className="mt-2 min-h-11 w-full border border-[var(--line)] bg-white px-3 font-normal">
+                    <option value="ML">Mililitros (ml)</option>
+                    <option value="KG">Kilogramos (kg)</option>
+                  </select>
+                </label>
+
+                <label className="text-sm font-semibold">
                   Costo unitario
                   <input
                     required
@@ -920,7 +949,7 @@ export default function ProductsPage() {
               </div>
               <div className="border border-[var(--line)] bg-slate-50 p-3">
                 <p className="text-[11px] uppercase tracking-wide text-[var(--muted)]">Stock</p>
-                <strong className="mt-1 block text-sm">{product.unit === "UNIT" ? wholeNumber(product.stock) : Number(product.stock).toFixed(3).replace(/\.000$/, "")} {unitLabels[product.unit ?? "UNIT"]}</strong>
+                <strong className="mt-1 block text-sm">{formatStock(product)}</strong>
               </div>
               <div className="border border-[var(--line)] bg-slate-50 p-3">
                 <p className="text-[11px] uppercase tracking-wide text-[var(--muted)]">Reposición</p>
@@ -1075,7 +1104,7 @@ export default function ProductsPage() {
             </div>
 
             <label className="mt-5 block text-sm font-semibold">
-              Cantidad disponible: {damageTarget.stock}
+              Cantidad disponible: {formatStock(damageTarget)}
               <input required min="0.001" max={Number(damageTarget.stock)} step={damageTarget.unit === "UNIT" ? "1" : "0.001"} type="number" value={damageQuantity} onChange={(event) => setDamageQuantity(event.target.value)} className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal" />
             </label>
 

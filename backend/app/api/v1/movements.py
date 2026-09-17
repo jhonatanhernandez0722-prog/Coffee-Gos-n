@@ -44,6 +44,9 @@ def list_movements(
     inventory_rows = database.execute(inventory_statement.order_by(InventoryMovement.created_at.desc()).limit(100)).all()
     financial_rows = database.execute(financial_statement.order_by(FinancialMovement.created_at.desc()).limit(100)).all()
 
+    inventory_sale_ids = {movement.sale_id for movement, _ in inventory_rows if movement.sale_id}
+    sale_financials = {movement.sale_id: (movement, quantity) for movement, quantity in financial_rows if movement.sale_id}
+
     internal_seller_ids = {movement.assigned_seller_id for movement, _ in inventory_rows if movement.assigned_seller_id}
     internal_sellers = dict(database.execute(select(User.id, User.full_name).where(User.id.in_(internal_seller_ids))).all()) if internal_seller_ids else {}
 
@@ -87,8 +90,9 @@ def list_movements(
                 id=movement.id,
                 domain="inventory",
                 related_id=movement.sale_id,
+                product_id=movement.product_id,
                 movement_type=movement.movement_type,
-                amount=None,
+                amount=sale_financials.get(movement.sale_id, (None, None))[0].amount if movement.sale_id and sale_financials.get(movement.sale_id) else None,
                 quantity=movement.quantity,
                 concept=movement.observation or movement.movement_type,
                 product_name=product_name,
@@ -99,12 +103,15 @@ def list_movements(
         )
 
     for movement, quantity in financial_rows:
+        if movement.sale_id in inventory_sale_ids:
+            continue
         sale_detail = sale_metadata.get(movement.sale_id, {})
         rows.append(
             MovementRow(
                 id=movement.id,
                 domain="financial",
                 related_id=movement.sale_id,
+                product_id=None,
                 movement_type=movement.movement_type,
                 amount=movement.amount,
                 quantity=quantity if movement.movement_type == "INCOME" else None,
@@ -135,14 +142,33 @@ def update_inventory_movement(
     if product is None:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
-    if payload.quantity is not None:
-        delta = payload.quantity - movement.quantity
+    quantity = payload.quantity if payload.quantity is not None else movement.quantity
+    new_product = product
+    if payload.product_id is not None and payload.product_id != movement.product_id:
+        new_product = database.scalar(select(Product).where(Product.id == payload.product_id).with_for_update())
+        if new_product is None or not new_product.is_active:
+            raise HTTPException(status_code=400, detail="El nuevo producto no está disponible")
         if movement.movement_type in {"SALE", "DAMAGE", "INTERNAL_USE"}:
-            product.stock -= delta
+            product.stock += movement.quantity
         elif movement.movement_type in {"PURCHASE", "ADJUSTMENT"}:
-            product.stock += delta
-        movement.quantity = payload.quantity
-        movement.stock_after = product.stock
+            product.stock -= movement.quantity
+            if product.stock < 0:
+                raise HTTPException(status_code=400, detail="El cambio dejaría el stock anterior en negativo")
+        movement.product_id = new_product.id
+        if movement.sale_id:
+            sale_item = database.scalar(select(SaleItem).where(SaleItem.sale_id == movement.sale_id, SaleItem.product_id == product.id))
+            if sale_item:
+                sale_item.product_id = new_product.id
+
+    delta = quantity if new_product.id != product.id else quantity - movement.quantity
+    if movement.movement_type in {"SALE", "DAMAGE", "INTERNAL_USE"}:
+        new_product.stock -= delta
+    elif movement.movement_type in {"PURCHASE", "ADJUSTMENT"}:
+        new_product.stock += delta
+    if new_product.stock < 0:
+        raise HTTPException(status_code=400, detail="La cantidad supera el stock disponible")
+    movement.quantity = quantity
+    movement.stock_after = new_product.stock
 
     if payload.observation is not None:
         movement.observation = payload.observation.strip() or None
@@ -156,6 +182,8 @@ def update_inventory_movement(
     database.commit()
     database.refresh(movement)
     database.refresh(product)
+    if new_product.id != product.id:
+        database.refresh(new_product)
 
     sale = database.get(Sale, movement.sale_id) if movement.sale_id else None
     customer_name = database.scalar(select(Customer.name).where(Customer.id == sale.customer_id)) if sale and sale.customer_id else None
@@ -165,11 +193,12 @@ def update_inventory_movement(
         id=movement.id,
         domain="inventory",
         related_id=movement.sale_id,
+        product_id=new_product.id,
         movement_type=movement.movement_type,
         amount=None,
         quantity=movement.quantity,
         concept=movement.observation or movement.movement_type,
-        product_name=product.name,
+        product_name=new_product.name,
         seller_name=seller_name,
         customer_name=customer_name,
         created_at=movement.created_at,

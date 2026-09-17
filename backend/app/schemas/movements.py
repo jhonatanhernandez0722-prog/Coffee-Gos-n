@@ -8,6 +8,7 @@ class MovementRow(BaseModel):
     id: int
     domain: str
     related_id: int | None
+    product_id: int | None = None
     movement_type: str
     amount: Decimal | None = None
     quantity: Decimal | None = None
@@ -23,6 +24,7 @@ class MovementsResponse(BaseModel):
 
 
 class InventoryMovementUpdate(BaseModel):
+    product_id: int | None = Field(default=None, gt=0)
     quantity: Decimal | None = Field(default=None, ge=0)
     observation: str | None = Field(default=None, max_length=500)
     assigned_seller_id: int | None = Field(default=None, gt=0)
