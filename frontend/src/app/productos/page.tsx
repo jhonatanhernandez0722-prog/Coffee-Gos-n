@@ -17,7 +17,7 @@ type Product = {
   restock_quantity: number;
   is_active: boolean;
   is_saleable: boolean;
-  unit: "KG" | "ML" | "UNIT";
+  unit: "KG" | "ML" | "UNIT" | "PAQUETE";
   content_quantity?: number | null;
   content_unit?: "G" | "KG" | "ML" | "L" | null;
   image_url?: string | null;
@@ -60,7 +60,7 @@ const normalizeDisplayNumber = (value: number | string | null | undefined, unit?
   if (value === null || value === undefined || value === "") return "";
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return "";
-  if (unit === "UNIT" || Number.isInteger(parsed)) return String(Math.trunc(parsed));
+  if (unit === "UNIT" || unit === "PAQUETE" || Number.isInteger(parsed)) return String(Math.trunc(parsed));
   return parsed.toString().replace(/(\.\d*?[1-9])0+$/, "$1").replace(/\.0+$/, "");
 };
 
@@ -68,14 +68,14 @@ const apiError = (result: { detail?: string | { msg?: string }[] }, fallback: st
   Array.isArray(result.detail)
     ? result.detail.map((item) => item.msg).filter(Boolean).join(". ") || fallback
     : result.detail || fallback;
-const unitLabels: Record<Product["unit"], string> = { KG: "kg", ML: "ml", UNIT: "unidad" };
+const unitLabels: Record<Product["unit"], string> = { KG: "kg", ML: "ml", UNIT: "unidad", PAQUETE: "paquete" };
 const contentUnitLabels: Record<"G" | "KG" | "ML" | "L", string> = { G: "g", KG: "kg", ML: "ml", L: "l" };
-const normalizeQuantityInput = (value: string, unit: Product["unit"]) => unit === "UNIT" ? value.replace(/[^0-9]/g, "") : value;
+const normalizeQuantityInput = (value: string, unit: Product["unit"]) => unit === "UNIT" || unit === "PAQUETE" ? value.replace(/[^0-9]/g, "") : value;
 const preventDecimalKeys = (event: KeyboardEvent<HTMLInputElement>) => {
   if ([".", ",", "e", "E", "+", "-"].includes(event.key)) event.preventDefault();
 };
 const formatStock = (product: Pick<Product, "stock" | "unit" | "content_quantity" | "content_unit">) => {
-  const stock = product.unit === "UNIT" ? wholeNumber(product.stock) : Number(product.stock).toFixed(3).replace(/\.000$/, "");
+  const stock = product.unit === "UNIT" || product.unit === "PAQUETE" ? wholeNumber(product.stock) : Number(product.stock).toFixed(3).replace(/\.000$/, "");
   const presentation = product.content_quantity && product.content_unit ? ` · ${Number(product.content_quantity).toString()} ${contentUnitLabels[product.content_unit]} c/u` : "";
   return `${stock} ${unitLabels[product.unit ?? "UNIT"]}${presentation}`;
 };
@@ -95,7 +95,7 @@ export default function ProductsPage() {
   const [cost, setCost] = useState("");
   const [stock, setStock] = useState("");
   const [restockQuantity, setRestockQuantity] = useState("10");
-  const [unit, setUnit] = useState<"KG" | "ML" | "UNIT">("UNIT");
+  const [unit, setUnit] = useState<Product["unit"]>("UNIT");
   const [contentQuantity, setContentQuantity] = useState("");
   const [contentUnit, setContentUnit] = useState<"G" | "KG" | "ML" | "L">("ML");
   const [image, setImage] = useState<File | null>(null);
@@ -180,8 +180,8 @@ export default function ProductsPage() {
     setNewCategoryName("");
     setSalePrice(String(product.sale_price));
     setCost(String(product.acquisition_cost));
-    setStock(product.unit === "UNIT" ? String(wholeNumber(product.stock)) : normalizeDisplayNumber(product.stock, product.unit));
-    setRestockQuantity(product.unit === "UNIT" ? String(wholeNumber(product.restock_quantity)) : normalizeDisplayNumber(product.restock_quantity, product.unit));
+    setStock(product.unit === "UNIT" || product.unit === "PAQUETE" ? String(wholeNumber(product.stock)) : normalizeDisplayNumber(product.stock, product.unit));
+    setRestockQuantity(product.unit === "UNIT" || product.unit === "PAQUETE" ? String(wholeNumber(product.restock_quantity)) : normalizeDisplayNumber(product.restock_quantity, product.unit));
     setUnit(section === "sale" ? "UNIT" : product.unit ?? "UNIT");
     setContentQuantity(product.content_quantity == null ? "" : normalizeDisplayNumber(product.content_quantity));
     setContentUnit(product.content_unit ?? "ML");
@@ -202,7 +202,7 @@ export default function ProductsPage() {
     event.preventDefault();
     if (!purchaseTarget) return;
 
-    const quantity = purchaseTarget?.unit === "UNIT" ? Math.trunc(Number(purchaseQuantity)) : Number(purchaseQuantity);
+    const quantity = purchaseTarget?.unit === "UNIT" || purchaseTarget?.unit === "PAQUETE" ? Math.trunc(Number(purchaseQuantity)) : Number(purchaseQuantity);
     const unitCost = Number(purchaseCost);
     if (!Number.isFinite(quantity) || quantity <= 0) {
       setError("La cantidad de compra debe ser mayor a cero.");
@@ -609,7 +609,7 @@ export default function ProductsPage() {
         Tipo: product.is_saleable ? "Venta" : "Aseo",
         Precio: product.sale_price,
         Costo: product.acquisition_cost,
-        Stock: product.unit === "UNIT" ? wholeNumber(product.stock) : Number(product.stock),
+        Stock: product.unit === "UNIT" || product.unit === "PAQUETE" ? wholeNumber(product.stock) : Number(product.stock),
         "Stock mínimo": product.low_stock_threshold,
         Estado: product.is_active ? "Activo" : "Deshabilitado",
       })),
@@ -827,10 +827,10 @@ export default function ProductsPage() {
                     <input
                       required
                       min="0"
-                      step={unit === "UNIT" ? "1" : "0.001"}
+                      step={unit === "UNIT" || unit === "PAQUETE" ? "1" : "0.001"}
                       type="number"
                       value={stock}
-                      onChange={(event) => setStock(normalizeQuantityInput(event.target.value, unit === "UNIT" ? "UNIT" : unit))}
+                      onChange={(event) => setStock(normalizeQuantityInput(event.target.value, unit === "UNIT" || unit === "PAQUETE" ? "UNIT" : unit))}
                       className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal"
                     />
                   </label>
@@ -871,6 +871,7 @@ export default function ProductsPage() {
                     className="mt-2 min-h-11 w-full border border-[var(--line)] bg-white px-3 font-normal"
                   >
                     <option value="UNIT">Unidad</option>
+                    <option value="PAQUETE">Paquete</option>
                     <option value="KG">Kilogramos (kg)</option>
                     <option value="ML">Mililitros (ml)</option>
                   </select>
@@ -880,7 +881,7 @@ export default function ProductsPage() {
                   <input
                     required
                     min="0"
-                    step={unit === "UNIT" ? "1" : "0.001"}
+                    step={unit === "UNIT" || unit === "PAQUETE" ? "1" : "0.001"}
                     type="number"
                     value={stock}
                     onChange={(event) => setStock(normalizeQuantityInput(event.target.value, unit))}
@@ -967,7 +968,7 @@ export default function ProductsPage() {
               </div>
               <div className="border border-[var(--line)] bg-slate-50 p-3">
                 <p className="text-[11px] uppercase tracking-wide text-[var(--muted)]">Reposición</p>
-                <strong className="mt-1 block text-sm">+{product.unit === "UNIT" ? wholeNumber(product.restock_quantity) : product.restock_quantity}</strong>
+                <strong className="mt-1 block text-sm">+{product.unit === "UNIT" || product.unit === "PAQUETE" ? wholeNumber(product.restock_quantity) : product.restock_quantity}</strong>
               </div>
             </div>
 
@@ -1017,7 +1018,7 @@ export default function ProductsPage() {
                 onClick={() => restockProduct(product)}
                 className="min-h-9 bg-emerald-600 px-3 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
               >
-                Restablecer (+{product.unit === "UNIT" ? wholeNumber(product.restock_quantity) : product.restock_quantity})
+                Restablecer (+{product.unit === "UNIT" || product.unit === "PAQUETE" ? wholeNumber(product.restock_quantity) : product.restock_quantity})
               </button>
               <button
                 type="button"
@@ -1049,7 +1050,7 @@ export default function ProductsPage() {
               <input
                 required
                 min="1"
-                  step={purchaseTarget?.unit === "UNIT" ? "1" : "0.001"}
+                  step={purchaseTarget?.unit === "UNIT" || purchaseTarget?.unit === "PAQUETE" ? "1" : "0.001"}
                 type="number"
                 value={purchaseQuantity}
                 onChange={(event) => setPurchaseQuantity(normalizeQuantityInput(event.target.value, purchaseTarget?.unit ?? "UNIT"))}
@@ -1119,7 +1120,7 @@ export default function ProductsPage() {
 
             <label className="mt-5 block text-sm font-semibold">
               Cantidad disponible: {formatStock(damageTarget)}
-              <input required min={damageTarget.unit === "UNIT" ? "1" : "0.001"} max={Number(damageTarget.stock)} step={damageTarget.unit === "UNIT" ? "1" : "0.001"} type="number" value={damageQuantity} onChange={(event) => setDamageQuantity(normalizeQuantityInput(event.target.value, damageTarget.unit))} className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal" />
+              <input required min={damageTarget.unit === "UNIT" || damageTarget.unit === "PAQUETE" ? "1" : "0.001"} max={Number(damageTarget.stock)} step={damageTarget.unit === "UNIT" || damageTarget.unit === "PAQUETE" ? "1" : "0.001"} type="number" value={damageQuantity} onChange={(event) => setDamageQuantity(normalizeQuantityInput(event.target.value, damageTarget.unit))} className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal" />
             </label>
 
             <label className="mt-4 block text-sm font-semibold">
@@ -1160,11 +1161,11 @@ export default function ProductsPage() {
                 required
                 min="0.001"
                 max={Number(takeTarget.stock)}
-                step={takeTarget.unit === "UNIT" ? "1" : "0.001"}
+                step={takeTarget.unit === "UNIT" || takeTarget.unit === "PAQUETE" ? "1" : "0.001"}
                 type="number"
                 value={takeQuantity}
-                onKeyDown={takeTarget.unit === "UNIT" ? preventDecimalKeys : undefined}
-                inputMode={takeTarget.unit === "UNIT" ? "numeric" : "decimal"}
+                onKeyDown={takeTarget.unit === "UNIT" || takeTarget.unit === "PAQUETE" ? preventDecimalKeys : undefined}
+                inputMode={takeTarget.unit === "UNIT" || takeTarget.unit === "PAQUETE" ? "numeric" : "decimal"}
                 onChange={(event) => setTakeQuantity(normalizeQuantityInput(event.target.value, takeTarget.unit))}
                 className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal"
               />

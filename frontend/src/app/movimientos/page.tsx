@@ -20,14 +20,14 @@ type Movement = {
   customer_name: string | null;
   created_at: string;
 };
-type ProductOption = { id: number; name: string; unit: "KG" | "ML" | "UNIT"; content_quantity?: number | null; content_unit?: "G" | "KG" | "ML" | "L" | null };
+type ProductOption = { id: number; name: string; unit: "KG" | "ML" | "UNIT" | "PAQUETE"; content_quantity?: number | null; content_unit?: "G" | "KG" | "ML" | "L" | null };
 
 const money = (value: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(value);
 const normalizeDisplayQuantity = (value: number | string | null | undefined, unit?: ProductOption["unit"]) => {
   if (value === null || value === undefined || value === "") return "";
   const num = Number(value);
   if (!Number.isFinite(num)) return "";
-  if (unit === "UNIT" || Number.isInteger(num)) return String(Math.trunc(num));
+  if (unit === "UNIT" || unit === "PAQUETE" || Number.isInteger(num)) return String(Math.trunc(num));
   return num.toString().replace(/(\.\d*?[1-9])0+$/, "$1").replace(/\.0+$/, "");
 };
 const quantityLabel = (value: number | null) => {
@@ -102,7 +102,7 @@ export default function MovementsPage() {
     try {
       const token = sessionStorage.getItem("coffee_gosen_access_token");
       const selectedProduct = products.find((product) => product.id === Number(editProductId));
-      const quantityValue = editQuantity.trim() ? selectedProduct?.unit === "UNIT" ? Math.trunc(Number(editQuantity)) : Number(editQuantity) : undefined;
+      const quantityValue = editQuantity.trim() ? selectedProduct?.unit === "UNIT" || selectedProduct?.unit === "PAQUETE" ? Math.trunc(Number(editQuantity)) : Number(editQuantity) : undefined;
       const endpoint = editing.domain === "inventory" ? `${apiUrl}/movements/inventory/${editing.id}` : `${apiUrl}/movements/financial/${editing.id}`;
       const payload = editing.domain === "inventory"
         ? {
