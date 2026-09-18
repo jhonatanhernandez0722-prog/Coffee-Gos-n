@@ -378,12 +378,6 @@ export default function DashboardPage() {
           icon: ShoppingBag,
         },
         {
-          label: "Ganancia de hoy",
-          value: formatCurrency(summary.profit_today),
-          detail: `Egresos ${formatCurrency(summary.expenses_today)}`,
-          icon: Package,
-        },
-        {
           label: "Donaciones digitadas",
           value: formatCurrency(summary.donation_income_total),
           detail: "Ingresos registrados, no ventas de hoy",
