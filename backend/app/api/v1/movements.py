@@ -7,10 +7,24 @@ from sqlalchemy.orm import Session, aliased
 from app.api.v1.dependencies import require_admin
 from app.core.permissions import require_section
 from app.db.session import get_db
-from app.models import Customer, FinancialMovement, InventoryMovement, Product, Sale, SaleItem, SaleSupport, User
+from app.models import Credit, Customer, FinancialMovement, InventoryMovement, Product, Sale, SaleItem, SaleSupport, User
 from app.schemas.movements import FinancialMovementUpdate, InventoryMovementUpdate, MovementRow, MovementsResponse
 
 router = APIRouter(prefix="/movements", tags=["movements"])
+
+
+def delete_sale_records(sale: Sale, database: Session) -> None:
+    inventory_movements = database.scalars(select(InventoryMovement).where(InventoryMovement.sale_id == sale.id)).all()
+    for movement in inventory_movements:
+        product = database.scalar(select(Product).where(Product.id == movement.product_id).with_for_update())
+        if product is not None:
+            product.stock += movement.quantity
+        database.delete(movement)
+    database.query(FinancialMovement).filter(FinancialMovement.sale_id == sale.id).delete(synchronize_session=False)
+    database.query(SaleItem).filter(SaleItem.sale_id == sale.id).delete(synchronize_session=False)
+    database.query(SaleSupport).filter(SaleSupport.sale_id == sale.id).delete(synchronize_session=False)
+    database.query(Credit).filter(Credit.sale_id == sale.id).delete(synchronize_session=False)
+    database.delete(sale)
 
 
 @router.get("", response_model=MovementsResponse)
@@ -280,3 +294,59 @@ def update_financial_movement(
         customer_name=customer_name,
         created_at=movement.created_at,
     )
+
+
+@router.delete("/{domain}/{movement_id}", status_code=204)
+def delete_movement(
+    domain: str,
+    movement_id: int,
+    database: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+) -> None:
+    if domain == "inventory":
+        movement = database.get(InventoryMovement, movement_id)
+        if movement is None:
+            raise HTTPException(status_code=404, detail="Movimiento de inventario no encontrado")
+        if movement.sale_id:
+            sale = database.get(Sale, movement.sale_id)
+            if sale is not None:
+                delete_sale_records(sale, database)
+        else:
+            product = database.scalar(select(Product).where(Product.id == movement.product_id).with_for_update())
+            if product is not None:
+                if movement.movement_type in {"PURCHASE", "ADJUSTMENT"}:
+                    product.stock -= movement.quantity
+                else:
+                    product.stock += movement.quantity
+                if product.stock < 0:
+                    raise HTTPException(status_code=400, detail="No se puede eliminar: el stock resultante sería negativo")
+            if movement.financial_movement_id:
+                financial_movement = database.get(FinancialMovement, movement.financial_movement_id)
+                if financial_movement is not None:
+                    database.delete(financial_movement)
+            database.delete(movement)
+    elif domain == "financial":
+        movement = database.get(FinancialMovement, movement_id)
+        if movement is None:
+            raise HTTPException(status_code=404, detail="Movimiento financiero no encontrado")
+        if movement.sale_id:
+            sale = database.get(Sale, movement.sale_id)
+            if sale is not None:
+                delete_sale_records(sale, database)
+        else:
+            linked_inventory = database.scalar(
+                select(InventoryMovement).where(
+                    InventoryMovement.financial_movement_id == movement.id,
+                )
+            )
+            if linked_inventory is not None:
+                product = database.scalar(select(Product).where(Product.id == linked_inventory.product_id).with_for_update())
+                if product is not None:
+                    product.stock -= linked_inventory.quantity
+                    if product.stock < 0:
+                        raise HTTPException(status_code=400, detail="No se puede eliminar: el stock resultante sería negativo")
+                database.delete(linked_inventory)
+            database.delete(movement)
+    else:
+        raise HTTPException(status_code=400, detail="Dominio de movimiento no válido")
+    database.commit()
