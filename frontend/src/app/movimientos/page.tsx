@@ -25,7 +25,7 @@ type ProductOption = {
   name: string;
   unit: "KG" | "ML" | "UNIT" | "PAQUETE";
   content_quantity?: number | null;
-  content_unit?: "G" | "KG" | "ML" | "L" | null;
+  content_unit?: "G" | "KG" | "ML" | "L" | "UNIT" | null;
 };
 
 const money = (value: number) =>

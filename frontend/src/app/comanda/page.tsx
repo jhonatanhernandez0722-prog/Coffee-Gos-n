@@ -7,7 +7,7 @@ import { AdminPage } from "@/components/admin-page";
 import { apiUrl } from "@/lib/api";
 import { downloadExcel } from "@/lib/excel";
 
-type Product = { id: number; name: string; sale_price: number; stock: number; unit: "KG" | "ML" | "UNIT" | "PAQUETE"; content_quantity?: number | null; content_unit?: "G" | "KG" | "ML" | "L" | null; image_url?: string | null };
+type Product = { id: number; name: string; sale_price: number; stock: number; unit: "KG" | "ML" | "UNIT" | "PAQUETE"; content_quantity?: number | null; content_unit?: "G" | "KG" | "ML" | "L" | "UNIT" | null; image_url?: string | null };
 type CartLine = Product & { quantity: number };
 type PaymentMethod = "CASH" | "NEQUI" | "CREDIT";
 type Customer = { id: number; name: string };
@@ -27,11 +27,11 @@ const readApiResponse = async (response: Response): Promise<{ detail?: string; [
 };
 const money = (value: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(value);
 const paymentLabel: Record<PaymentMethod, string> = { CASH: "Efectivo", NEQUI: "Nequi", CREDIT: "Crédito" };
-const contentUnitLabels: Record<"G" | "KG" | "ML" | "L", string> = { G: "g", KG: "kg", ML: "ml", L: "l" };
+const contentUnitLabels: Record<"G" | "KG" | "ML" | "L" | "UNIT", string> = { G: "g", KG: "kg", ML: "ml", L: "l", UNIT: "unidad" };
 const formatStock = (product: Pick<Product, "stock" | "unit" | "content_quantity" | "content_unit">) => {
   const stock = product.unit === "UNIT" || product.unit === "PAQUETE" ? Math.round(Number(product.stock)) : Number(product.stock).toFixed(3).replace(/\.000$/, "");
   const presentation = product.content_quantity && product.content_unit ? ` · ${Number(product.content_quantity).toString()} ${contentUnitLabels[product.content_unit]} c/u` : "";
-  return `${stock} ${product.unit === "UNIT" ? "unidad" : product.unit === "PAQUETE" ? "paquete" : product.unit.toLowerCase()}${presentation}`;
+  return `${stock} ${product.unit === "UNIT" ? "unidad" : product.unit === "PAQUETE" ? "paquete" : product.unit.toLowerCase()}${presentation ? presentation.replace("c/u", product.unit === "PAQUETE" ? "por paquete" : "por unidad") : ""}`;
 };
 
 export default function ComandaPage() {

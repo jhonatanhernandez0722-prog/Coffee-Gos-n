@@ -24,7 +24,7 @@ class ProductCreate(BaseModel):
     image_url: str | None = Field(default=None, max_length=500)
     unit: Literal["KG", "ML", "UNIT", "PAQUETE"] = "UNIT"
     content_quantity: Decimal | None = Field(default=None, gt=0, decimal_places=3)
-    content_unit: Literal["G", "KG", "ML", "L"] | None = None
+    content_unit: Literal["G", "KG", "ML", "L", "UNIT"] | None = None
     is_saleable: bool = True
     sale_price: Decimal = Field(ge=0, decimal_places=2)
     acquisition_cost: Decimal = Field(ge=0, decimal_places=2)
@@ -40,7 +40,7 @@ class ProductUpdate(BaseModel):
     image_url: str | None = Field(default=None, max_length=500)
     unit: Literal["KG", "ML", "UNIT", "PAQUETE"] | None = None
     content_quantity: Decimal | None = Field(default=None, gt=0, decimal_places=3)
-    content_unit: Literal["G", "KG", "ML", "L"] | None = None
+    content_unit: Literal["G", "KG", "ML", "L", "UNIT"] | None = None
     is_saleable: bool | None = None
     sale_price: Decimal | None = Field(default=None, ge=0, decimal_places=2)
     acquisition_cost: Decimal | None = Field(default=None, ge=0, decimal_places=2)

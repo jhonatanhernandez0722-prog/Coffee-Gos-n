@@ -20,7 +20,7 @@ type Product = {
   is_saleable: boolean;
   unit: "KG" | "ML" | "UNIT" | "PAQUETE";
   content_quantity?: number | null;
-  content_unit?: "G" | "KG" | "ML" | "L" | null;
+  content_unit?: "G" | "KG" | "ML" | "L" | "UNIT" | null;
   image_url?: string | null;
 };
 
@@ -65,14 +65,14 @@ const apiError = (result: { detail?: string | { msg?: string }[] }, fallback: st
     ? result.detail.map((item) => item.msg).filter(Boolean).join(". ") || fallback
     : result.detail || fallback;
 const unitLabels: Record<Product["unit"], string> = { KG: "kg", ML: "ml", UNIT: "unidad", PAQUETE: "paquete" };
-const contentUnitLabels: Record<"G" | "KG" | "ML" | "L", string> = { G: "g", KG: "kg", ML: "ml", L: "l" };
+const contentUnitLabels: Record<"G" | "KG" | "ML" | "L" | "UNIT", string> = { G: "g", KG: "kg", ML: "ml", L: "l", UNIT: "unidad" };
 const normalizeQuantityInput = (value: string, unit: Product["unit"]) => unit === "UNIT" || unit === "PAQUETE" ? value.replace(/[^0-9]/g, "") : value;
 const preventDecimalKeys = (event: KeyboardEvent<HTMLInputElement>) => {
   if ([".", ",", "e", "E", "+", "-"].includes(event.key)) event.preventDefault();
 };
 const formatStock = (product: Pick<Product, "stock" | "unit" | "content_quantity" | "content_unit">) => {
   const stock = product.unit === "UNIT" || product.unit === "PAQUETE" ? wholeNumber(product.stock) : Number(product.stock).toFixed(3).replace(/\.000$/, "");
-  const presentation = product.content_quantity && product.content_unit ? ` · ${Number(product.content_quantity).toString()} ${contentUnitLabels[product.content_unit]} c/u` : "";
+  const presentation = product.content_quantity && product.content_unit ? ` · ${Number(product.content_quantity).toString()} ${contentUnitLabels[product.content_unit]} por ${product.unit === "PAQUETE" ? "paquete" : "unidad"}` : "";
   return `${stock} ${unitLabels[product.unit ?? "UNIT"]}${presentation}`;
 };
 
@@ -93,7 +93,7 @@ export default function ProductsPage() {
   const [restockQuantity, setRestockQuantity] = useState("10");
   const [unit, setUnit] = useState<Product["unit"]>("UNIT");
   const [contentQuantity, setContentQuantity] = useState("");
-  const [contentUnit, setContentUnit] = useState<"G" | "KG" | "ML" | "L">("ML");
+  const [contentUnit, setContentUnit] = useState<"G" | "KG" | "ML" | "L" | "UNIT">("ML");
   const [image, setImage] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -886,16 +886,17 @@ export default function ProductsPage() {
                 </label>
 
                 <label className="text-sm font-semibold">
-                  Contenido por unidad (opcional)
+                  Contenido por {unit === "PAQUETE" ? "paquete" : "unidad"} (opcional)
                   <input min="0.001" step="0.001" type="number" value={contentQuantity} onChange={(event) => setContentQuantity(event.target.value)} className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal" placeholder="Ej. 250" />
                 </label>
                 <label className="text-sm font-semibold">
                   Unidad del contenido
-                  <select value={contentUnit} onChange={(event) => setContentUnit(event.target.value as "G" | "KG" | "ML" | "L")} className="mt-2 min-h-11 w-full border border-[var(--line)] bg-white px-3 font-normal">
+                  <select value={contentUnit} onChange={(event) => setContentUnit(event.target.value as "G" | "KG" | "ML" | "L" | "UNIT")} className="mt-2 min-h-11 w-full border border-[var(--line)] bg-white px-3 font-normal">
                     <option value="G">Gramos (g)</option>
                     <option value="ML">Mililitros (ml)</option>
                     <option value="KG">Kilogramos (kg)</option>
                     <option value="L">Litros (l)</option>
+                    <option value="UNIT">Unidades</option>
                   </select>
                 </label>
 
