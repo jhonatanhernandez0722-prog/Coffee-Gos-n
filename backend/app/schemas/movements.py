@@ -17,6 +17,7 @@ class MovementRow(BaseModel):
     product_name: str | None = None
     seller_name: str | None = None
     customer_name: str | None = None
+    source_combo_product_id: int | None = None
     created_at: datetime
 
 

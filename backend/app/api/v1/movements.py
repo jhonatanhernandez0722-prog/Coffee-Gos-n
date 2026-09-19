@@ -117,6 +117,7 @@ def list_movements(
                 product_name=product_name,
                 seller_name=seller_name,
                 customer_name=customer_name,
+                source_combo_product_id=movement.source_combo_product_id,
                 created_at=movement.created_at,
             )
         )
@@ -156,6 +157,8 @@ def update_inventory_movement(
     movement = database.get(InventoryMovement, movement_id)
     if movement is None:
         raise HTTPException(status_code=404, detail="Movimiento de inventario no encontrado")
+    if movement.sale_id:
+        raise HTTPException(status_code=409, detail="Los movimientos de una venta no se pueden editar individualmente")
 
     product = database.get(Product, movement.product_id)
     if product is None:
@@ -264,6 +267,8 @@ def update_financial_movement(
     movement = database.get(FinancialMovement, movement_id)
     if movement is None:
         raise HTTPException(status_code=404, detail="Movimiento financiero no encontrado")
+    if movement.sale_id:
+        raise HTTPException(status_code=409, detail="Los movimientos de una venta no se pueden editar individualmente")
 
     if payload.amount is not None:
         movement.amount = payload.amount

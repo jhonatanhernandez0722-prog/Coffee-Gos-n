@@ -18,6 +18,7 @@ type Movement = {
   product_name: string | null;
   seller_name: string | null;
   customer_name: string | null;
+  source_combo_product_id: number | null;
   created_at: string;
 };
 type ProductOption = {
@@ -398,6 +399,9 @@ export default function MovementsPage() {
                         <div className="mt-1 text-[var(--muted)]">
                           Monto: {money(movement.amount)}
                         </div>
+                      )}
+                      {movement.source_combo_product_id !== null && (
+                        <div className="mt-1 text-xs font-semibold text-amber-700">Componente consumido por un combo</div>
                       )}
                     </td>
                     <td className="p-4 text-[var(--muted)]">

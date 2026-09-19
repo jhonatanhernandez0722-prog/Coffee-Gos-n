@@ -3,7 +3,7 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import List, Optional
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String, Text, func
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -102,6 +102,7 @@ class Product(Base):
     description: Mapped[Optional[str]] = mapped_column(Text())
     image_url: Mapped[Optional[str]] = mapped_column(String(500))
     unit: Mapped[str] = mapped_column(String(20), default="UNIT", server_default="UNIT")
+    is_combo: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", index=True)
     content_quantity: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 3))
     content_unit: Mapped[Optional[str]] = mapped_column(String(20))
     is_saleable: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -112,6 +113,26 @@ class Product(Base):
     restock_quantity: Mapped[Decimal] = mapped_column(Numeric(12, 3), default=10)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     category: Mapped[Category] = relationship(back_populates="products")
+    combo_components: Mapped[List["ComboComponent"]] = relationship(
+        back_populates="combo_product",
+        foreign_keys="ComboComponent.combo_product_id",
+        cascade="all, delete-orphan",
+    )
+
+
+class ComboComponent(Base):
+    __tablename__ = "combo_components"
+    __table_args__ = (
+        UniqueConstraint("combo_product_id", "component_product_id", name="uq_combo_component_product"),
+        CheckConstraint("quantity > 0", name="ck_combo_component_quantity_positive"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    combo_product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
+    component_product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(12, 3))
+    combo_product: Mapped[Product] = relationship(foreign_keys=[combo_product_id], back_populates="combo_components")
+    component_product: Mapped[Product] = relationship(foreign_keys=[component_product_id])
 
 
 class Customer(Base):
@@ -174,6 +195,7 @@ class InventoryMovement(Base):
     financial_movement_id: Mapped[Optional[int]] = mapped_column(ForeignKey("financial_movements.id"), index=True)
     sale_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sales.id"))
     assigned_seller_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), index=True)
+    source_combo_product_id: Mapped[Optional[int]] = mapped_column(ForeignKey("products.id"), index=True)
     observation: Mapped[Optional[str]] = mapped_column(Text())
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 

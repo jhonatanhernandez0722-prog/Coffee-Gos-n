@@ -19,10 +19,14 @@ type Product = {
   is_active: boolean;
   is_saleable: boolean;
   unit: "KG" | "ML" | "UNIT" | "PAQUETE";
+  is_combo: boolean;
+  components?: ComboComponent[];
   content_quantity?: number | null;
   content_unit?: "G" | "KG" | "ML" | "L" | "UNIT" | null;
   image_url?: string | null;
 };
+
+type ComboComponent = { product_id: number; product_name?: string; quantity: number };
 
 type Category = { id: number; name: string; is_active: boolean };
 type Section = "sale" | "insumos" | "desechables" | "limpieza" | "started";
@@ -92,6 +96,8 @@ export default function ProductsPage() {
   const [stock, setStock] = useState("");
   const [restockQuantity, setRestockQuantity] = useState("10");
   const [unit, setUnit] = useState<Product["unit"]>("UNIT");
+  const [isCombo, setIsCombo] = useState(false);
+  const [comboComponents, setComboComponents] = useState<ComboComponent[]>([]);
   const [contentQuantity, setContentQuantity] = useState("");
   const [contentUnit, setContentUnit] = useState<"G" | "KG" | "ML" | "L" | "UNIT">("ML");
   const [image, setImage] = useState<File | null>(null);
@@ -163,6 +169,8 @@ export default function ProductsPage() {
     setStock("");
     setRestockQuantity("10");
     setUnit("UNIT");
+    setIsCombo(false);
+    setComboComponents([]);
     setContentQuantity("");
     setContentUnit("ML");
     setImage(null);
@@ -179,6 +187,8 @@ export default function ProductsPage() {
     setStock(product.unit === "UNIT" || product.unit === "PAQUETE" ? String(wholeNumber(product.stock)) : normalizeDisplayNumber(product.stock, product.unit));
     setRestockQuantity(product.unit === "UNIT" || product.unit === "PAQUETE" ? String(wholeNumber(product.restock_quantity)) : normalizeDisplayNumber(product.restock_quantity, product.unit));
     setUnit(section === "sale" ? "UNIT" : product.unit ?? "UNIT");
+    setIsCombo(Boolean(product.is_combo));
+    setComboComponents(product.components?.map((component) => ({ product_id: component.product_id, quantity: Number(component.quantity) })) ?? []);
     setContentQuantity(product.content_quantity == null ? "" : normalizeDisplayNumber(product.content_quantity));
     setContentUnit(product.content_unit ?? "ML");
     setImage(null);
@@ -246,6 +256,24 @@ export default function ProductsPage() {
   async function saveProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    if (section === "sale" && isCombo) {
+      if (comboComponents.length === 0) {
+        setError("Agrega al menos un producto a la composición del combo.");
+        return;
+      }
+      if (comboComponents.some((component) => !component.product_id || !Number.isFinite(Number(component.quantity)) || Number(component.quantity) <= 0)) {
+        setError("Cada componente debe tener un producto y una cantidad mayor que cero.");
+        return;
+      }
+      if (new Set(comboComponents.map((component) => component.product_id)).size !== comboComponents.length) {
+        setError("No puedes repetir un producto dentro del mismo combo.");
+        return;
+      }
+      if (editing && comboComponents.some((component) => component.product_id === editing.id)) {
+        setError("Un combo no puede componerse de sí mismo.");
+        return;
+      }
+    }
     setSaving(true);
 
     try {
@@ -292,6 +320,8 @@ export default function ProductsPage() {
             stock: Number(stock),
             restock_quantity: Number(restockQuantity),
             is_saleable: section === "sale",
+            is_combo: section === "sale" && isCombo,
+            components: section === "sale" && isCombo ? comboComponents.map((component) => ({ product_id: component.product_id, quantity: Number(component.quantity) })) : [],
           }),
         });
         const result = await response.json();
@@ -365,6 +395,8 @@ export default function ProductsPage() {
           low_stock_threshold: 5,
           restock_quantity: Number(restockQuantity),
           is_saleable: section === "sale",
+          is_combo: section === "sale" && isCombo,
+          components: section === "sale" && isCombo ? comboComponents.map((component) => ({ product_id: component.product_id, quantity: Number(component.quantity) })) : [],
         }),
       });
       const result = await response.json();
@@ -758,6 +790,44 @@ export default function ProductsPage() {
 
             {section === "sale" && (
               <>
+                <label className="text-sm font-semibold sm:col-span-2">
+                  ¿Es un combo?
+                  <select
+                    value={isCombo ? "yes" : "no"}
+                    onChange={(event) => {
+                      const nextIsCombo = event.target.value === "yes";
+                      setIsCombo(nextIsCombo);
+                      if (nextIsCombo && comboComponents.length === 0) setComboComponents([{ product_id: 0, quantity: 1 }]);
+                      if (!nextIsCombo) setComboComponents([]);
+                    }}
+                    className="mt-2 min-h-11 w-full border border-[var(--line)] bg-white px-3 font-normal"
+                  >
+                    <option value="no">No</option>
+                    <option value="yes">Sí</option>
+                  </select>
+                </label>
+
+                {isCombo && (
+                  <div className="border border-[var(--blue-main)] bg-[var(--blue-light)] p-4 sm:col-span-2">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h3 className="font-semibold">Composición del combo</h3>
+                        <p className="mt-1 text-xs text-[var(--muted)]">El stock del combo se descuenta por separado; aquí defines lo que consume cada combo.</p>
+                      </div>
+                      <button type="button" onClick={() => setComboComponents((current) => [...current, { product_id: 0, quantity: 1 }])} className="min-h-9 border border-[var(--blue-main)] bg-white px-3 text-xs font-semibold text-[var(--blue-main)]">+ Agregar producto</button>
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      {comboComponents.map((component, index) => (
+                        <div key={`${index}-${component.product_id}`} className="grid gap-3 border border-[var(--line)] bg-white p-3 sm:grid-cols-[minmax(0,1fr)_140px_auto] sm:items-end">
+                          <label className="text-xs font-semibold">Producto {index + 1}<select value={component.product_id || ""} onChange={(event) => setComboComponents((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, product_id: Number(event.target.value) } : item))} className="mt-1 min-h-10 w-full border border-[var(--line)] bg-white px-3 text-sm font-normal"><option value="">Selecciona un producto</option>{products.filter((product) => product.is_active && product.is_saleable && product.id !== editing?.id).map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
+                          <label className="text-xs font-semibold">Cantidad<input min="0.001" step="0.001" type="number" value={component.quantity} onChange={(event) => setComboComponents((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, quantity: Number(event.target.value) } : item))} className="mt-1 min-h-10 w-full border border-[var(--line)] px-3 text-sm font-normal" /></label>
+                          <button type="button" aria-label={`Eliminar producto ${index + 1}`} onClick={() => setComboComponents((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="inline-flex min-h-10 items-center justify-center border border-red-200 px-3 text-xs font-semibold text-red-700"><X size={15} /> Quitar</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <label className="text-sm font-semibold">
                   Categoría
                   <select
@@ -947,6 +1017,7 @@ export default function ProductsPage() {
                 <div className="min-w-0">
                   <h3 className="truncate text-base font-semibold">{product.name}</h3>
                   <p className="text-xs text-[var(--muted)]">{section === "sale" ? `Categoría #${product.category_id}` : section === "desechables" ? "Desechable" : section === "limpieza" ? "Gosen Limpieza" : "Insumo"}</p>
+                  {product.is_combo && <span className="mt-1 inline-flex border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-800">COMBO</span>}
                 </div>
               </div>
               <span className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${product.is_active ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-600"}`}>
@@ -968,6 +1039,8 @@ export default function ProductsPage() {
                 <strong className="mt-1 block text-sm">+{product.unit === "UNIT" || product.unit === "PAQUETE" ? wholeNumber(product.restock_quantity) : product.restock_quantity}</strong>
               </div>
             </div>
+
+            {product.is_combo && product.components?.length ? <div className="mt-4 border border-amber-200 bg-amber-50 p-3 text-xs"><strong className="text-amber-900">Compuesto por</strong><ul className="mt-2 space-y-1 text-amber-950">{product.components.map((component) => <li key={component.product_id}>{component.quantity} x {component.product_name ?? products.find((item) => item.id === component.product_id)?.name ?? "Producto"}</li>)}</ul></div> : null}
 
             <div className="mt-4 flex flex-wrap gap-2">
               <button

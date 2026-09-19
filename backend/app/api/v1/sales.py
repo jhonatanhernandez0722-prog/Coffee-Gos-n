@@ -15,6 +15,7 @@ from app.core.media import upload_to_imagekit
 from app.core.config import settings
 from app.db.session import get_db
 from app.models import (
+    ComboComponent,
     Credit,
     Customer,
     FinancialMovement,
@@ -29,6 +30,33 @@ from app.schemas.sales import SaleCreate, SaleItemResponse, SaleResponse
 
 router = APIRouter(prefix="/sales", tags=["sales"])
 media_directory = Path("/tmp/coffee-gosen-media") if settings.environment == "production" or os.getenv("VERCEL") else Path(__file__).resolve().parents[3] / "storage"
+
+
+def expand_product_requirements(
+    product_id: int,
+    multiplier: Decimal,
+    database: Session,
+    requirements: dict[int, Decimal],
+    visiting: set[int],
+    source_combo_id: int | None = None,
+    sources: dict[int, int] | None = None,
+) -> None:
+    if product_id in visiting:
+        raise HTTPException(status_code=400, detail="La composición de combos contiene un ciclo")
+    requirements[product_id] = requirements.get(product_id, Decimal("0")) + multiplier
+    if source_combo_id is not None and product_id != source_combo_id and sources is not None:
+        sources.setdefault(product_id, source_combo_id)
+    product = database.get(Product, product_id)
+    if product is None or not product.is_combo:
+        return
+    visiting.add(product_id)
+    source_combo_id = source_combo_id or product_id
+    components = database.scalars(select(ComboComponent).where(ComboComponent.combo_product_id == product_id)).all()
+    if not components:
+        raise HTTPException(status_code=400, detail=f"El combo {product.name} no tiene productos componentes")
+    for component in components:
+        expand_product_requirements(component.component_product_id, multiplier * component.quantity, database, requirements, visiting, source_combo_id, sources)
+    visiting.remove(product_id)
 
 
 @router.post("", response_model=SaleResponse, status_code=status.HTTP_201_CREATED)
@@ -47,14 +75,27 @@ def create_sale(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Each product can appear only once")
 
     try:
-        locked_products = {}
+        requirements: dict[int, Decimal] = {}
+        component_sources: dict[int, int] = {}
         for item in payload.items:
-            product = database.scalar(select(Product).where(Product.id == item.product_id).with_for_update())
+            expand_product_requirements(item.product_id, Decimal(item.quantity), database, requirements, set(), None, component_sources)
+
+        locked_products = {
+            product.id: product
+            for product in database.scalars(
+                select(Product).where(Product.id.in_(requirements)).order_by(Product.id).with_for_update()
+            ).all()
+        }
+        for item in payload.items:
+            product = locked_products.get(item.product_id)
             if product is None or not product.is_active or not product.is_saleable:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Product is not available")
-            if product.stock < item.quantity:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Insufficient stock for {product.name}")
-            locked_products[item.product_id] = product
+        for product_id, quantity in requirements.items():
+            product = locked_products.get(product_id)
+            if product is None or not product.is_active or not product.is_saleable:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Un componente del combo no está disponible")
+            if product.stock < quantity:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"No hay suficiente stock para {product.name}: se requieren {quantity} y hay {product.stock}")
 
         customer = None
         if payload.customer_id:
@@ -86,9 +127,12 @@ def create_sale(
         database.flush()
         for item in payload.items:
             product = locked_products[item.product_id]
-            product.stock -= item.quantity
             database.add(SaleItem(sale_id=sale.id, product_id=product.id, quantity=item.quantity, unit_price=product.sale_price, unit_cost_snapshot=product.acquisition_cost))
-            database.add(InventoryMovement(product_id=product.id, user_id=current_user.id, movement_type="SALE", quantity=item.quantity, stock_after=product.stock, sale_id=sale.id))
+        for product_id, quantity in requirements.items():
+            product = locked_products[product_id]
+            product.stock -= quantity
+            source_combo_id = component_sources.get(product_id)
+            database.add(InventoryMovement(product_id=product.id, user_id=current_user.id, movement_type="SALE", quantity=quantity, stock_after=product.stock, sale_id=sale.id, source_combo_product_id=source_combo_id, observation=f"Componente de combo {locked_products[source_combo_id].name}" if source_combo_id else None))
         credit_created = payload.payment_method == "CREDIT"
         if not credit_created:
             database.add(FinancialMovement(user_id=current_user.id, movement_type="INCOME", amount=subtotal, concept=f"Venta {sale.sale_number}", sale_id=sale.id, payment_method=payload.payment_method))

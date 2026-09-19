@@ -2,6 +2,7 @@ from app.models.domain import (
     AlertRead,
     AppSetting,
     Category,
+    ComboComponent,
     Credit,
     Customer,
     ExpenseCategory,
@@ -19,6 +20,7 @@ from app.models.domain import (
 __all__ = [
     "AlertRead",
     "Category",
+    "ComboComponent",
     "Credit",
     "Customer",
     "ExpenseCategory",

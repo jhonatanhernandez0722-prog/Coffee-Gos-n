@@ -12,7 +12,7 @@ from app.core.permissions import require_any_section, require_section
 from app.core.config import settings
 from app.core.media import upload_to_imagekit
 from app.db.session import get_db
-from app.models import Category, InventoryMovement, Product, User
+from app.models import Category, ComboComponent, InventoryMovement, Product, User
 from app.models import SaleItem
 from app.schemas.catalog import (
     CategoryCreate,
@@ -21,6 +21,59 @@ from app.schemas.catalog import (
     ProductResponse,
     ProductUpdate,
 )
+
+
+def validate_components(
+    product_id: int | None,
+    is_combo: bool,
+    components: list,
+    database: Session,
+) -> list[tuple[Product, object]]:
+    if not is_combo:
+        if components:
+            raise HTTPException(status_code=400, detail="Un producto normal no puede tener composición")
+        return []
+    if not components:
+        raise HTTPException(status_code=400, detail="Un combo debe tener al menos un producto componente")
+    component_ids = [component.product_id for component in components]
+    if len(component_ids) != len(set(component_ids)):
+        raise HTTPException(status_code=400, detail="Un producto no puede repetirse en la composición")
+    if product_id is not None and product_id in component_ids:
+        raise HTTPException(status_code=400, detail="Un combo no puede componerse de sí mismo")
+    products = {
+        product.id: product
+        for product in database.scalars(select(Product).where(Product.id.in_(component_ids))).all()
+    }
+    if len(products) != len(component_ids):
+        raise HTTPException(status_code=400, detail="Todos los productos componentes deben existir")
+    for component in components:
+        product = products[component.product_id]
+        if not product.is_active or not product.is_saleable:
+            raise HTTPException(status_code=400, detail=f"El producto componente no está disponible: {product.name}")
+        if product.unit in {"UNIT", "PAQUETE"} and component.quantity != component.quantity.to_integral_value():
+            raise HTTPException(status_code=400, detail=f"La cantidad de {product.name} debe ser un número entero")
+        if product_id is not None and product.is_combo:
+            pending = [component.product_id]
+            visited: set[int] = set()
+            while pending:
+                current_id = pending.pop()
+                if current_id == product_id:
+                    raise HTTPException(status_code=400, detail="La composición de combos contiene un ciclo")
+                if current_id in visited:
+                    continue
+                visited.add(current_id)
+                pending.extend(
+                    database.scalars(
+                        select(ComboComponent.component_product_id).where(ComboComponent.combo_product_id == current_id)
+                    ).all()
+                )
+    return [(products[component.product_id], component.quantity) for component in components]
+
+
+def replace_components(product: Product, components: list[tuple[Product, object]], database: Session) -> None:
+    product.combo_components.clear()
+    for component_product, quantity in components:
+        product.combo_components.append(ComboComponent(component_product=component_product, quantity=quantity))
 router = APIRouter(tags=["catalog"])
 media_directory = Path(__file__).resolve().parents[3] / "storage"
 
@@ -83,7 +136,11 @@ def create_product(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Active category is required")
     if payload.unit in {"UNIT", "PAQUETE"} and any(value != value.to_integral_value() for value in (payload.stock, payload.low_stock_threshold, payload.restock_quantity)):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Los productos por unidad o paquete solo aceptan cantidades enteras")
-    product = Product(**payload.model_dump())
+    if payload.is_combo and payload.unit != "UNIT":
+        raise HTTPException(status_code=400, detail="Los combos deben medirse en unidades")
+    components = validate_components(None, payload.is_combo, payload.components, database)
+    product = Product(**payload.model_dump(exclude={"components"}))
+    replace_components(product, components, database)
     database.add(product)
     database.commit()
     database.refresh(product)
@@ -106,6 +163,17 @@ def update_product(
         if category is None or not category.is_active:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Active category is required")
     effective_unit = values.get("unit", product.unit)
+    effective_is_combo = values.get("is_combo", product.is_combo)
+    if effective_is_combo and effective_unit != "UNIT":
+        raise HTTPException(status_code=400, detail="Los combos deben medirse en unidades")
+    if "components" in values:
+        component_payload = values.pop("components") or []
+    else:
+        component_payload = None
+    if "is_combo" in values:
+        values.pop("is_combo")
+    if component_payload is not None or "is_combo" in payload.model_fields_set:
+        validate_components(product.id, effective_is_combo, component_payload or [], database)
     if effective_unit in {"UNIT", "PAQUETE"}:
         for field in ("stock", "low_stock_threshold", "restock_quantity"):
             value = values.get(field, getattr(product, field))
@@ -113,6 +181,10 @@ def update_product(
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Los productos por unidad o paquete solo aceptan cantidades enteras")
     for field, value in values.items():
         setattr(product, field, value)
+    if component_payload is not None:
+        replace_components(product, validate_components(product.id, effective_is_combo, component_payload, database), database)
+    elif not effective_is_combo:
+        replace_components(product, [], database)
     database.commit()
     database.refresh(product)
     return product
@@ -150,6 +222,9 @@ def disable_product(
     product = database.get(Product, product_id)
     if product is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    used_by_combo = database.scalar(select(ComboComponent.id).where(ComboComponent.component_product_id == product_id).limit(1))
+    if used_by_combo:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Este producto forma parte de un combo y no se puede deshabilitar")
     product.is_active = False
     database.commit()
     database.refresh(product)
@@ -220,7 +295,8 @@ def delete_product(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     sale_count = database.scalar(select(SaleItem.id).where(SaleItem.product_id == product_id).limit(1))
     movement_count = database.scalar(select(InventoryMovement.id).where(InventoryMovement.product_id == product_id).limit(1))
-    if sale_count or movement_count:
+    component_count = database.scalar(select(ComboComponent.id).where(ComboComponent.component_product_id == product_id).limit(1))
+    if sale_count or movement_count or component_count:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Este producto tiene historial y no se puede eliminar; puedes deshabilitarlo")
     database.delete(product)
     database.commit()
