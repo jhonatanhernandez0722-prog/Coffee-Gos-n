@@ -69,6 +69,39 @@ def settle_pending_expenses(database: Session = Depends(get_db), _: User = Depen
     return SettleExpensesResponse(count=len(pending), amount=amount, settled_at=now)
 
 
+@router.post("/{expense_id}/settle", response_model=ExpenseResponse)
+def settle_expense(
+    expense_id: int,
+    authorization_pin: str,
+    database: Session = Depends(get_db),
+    _: User = Depends(require_section("egresos")),
+) -> ExpenseResponse:
+    if authorization_pin != settings.aseo_pin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="El PIN de autorización no es válido")
+    movement, category_name = database.execute(
+        select(FinancialMovement, ExpenseCategory.name)
+        .join(ExpenseCategory, ExpenseCategory.id == FinancialMovement.expense_category_id)
+        .where(FinancialMovement.id == expense_id, FinancialMovement.movement_type == "EXPENSE")
+    ).one_or_none() or (None, None)
+    if movement is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Egreso no encontrado")
+    if movement.settled_at is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El egreso ya fue registrado en el saldo")
+    movement.settled_at = datetime.now(timezone.utc)
+    database.commit()
+    database.refresh(movement)
+    return ExpenseResponse(
+        id=movement.id,
+        amount=movement.amount,
+        payment_method=movement.payment_method or "CASH",
+        category_name=category_name,
+        product=movement.product,
+        observation=movement.observation or movement.concept,
+        created_at=movement.created_at,
+        settled_at=movement.settled_at,
+    )
+
+
 @router.patch("/{expense_id}", response_model=ExpenseResponse)
 def update_expense(
     expense_id: int,

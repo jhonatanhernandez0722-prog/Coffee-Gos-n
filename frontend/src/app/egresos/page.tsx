@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { Banknote, Download, ReceiptText, Trash2, X } from "lucide-react";
+import { Banknote, Download, KeyRound, Pencil, ReceiptText, Trash2, X } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
 import { apiUrl } from "@/lib/api";
 import { downloadExcel } from "@/lib/excel";
@@ -34,8 +34,9 @@ export default function ExpensesPage() {
   const [product, setProduct] = useState("");
   const [observation, setObservation] = useState("");
   const [deleting, setDeleting] = useState<Expense | null>(null);
+  const [editing, setEditing] = useState<Expense | null>(null);
   const [settleModalOpen, setSettleModalOpen] = useState(false);
-  const [earlyExpenseModalOpen, setEarlyExpenseModalOpen] = useState(false);
+  const [authorizing, setAuthorizing] = useState<Expense | null>(null);
   const [password, setPassword] = useState("");
   const [authorizationPin, setAuthorizationPin] = useState("");
   const [error, setError] = useState("");
@@ -96,7 +97,7 @@ export default function ExpensesPage() {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       };
-      let selectedCategoryId = Number(categoryId);
+      const selectedCategoryId = Number(categoryId);
       if (!selectedCategoryId) throw new Error("Selecciona una categoría.");
       const response = await fetch(`${apiUrl}/expenses`, {
         method: "POST",
@@ -121,7 +122,6 @@ export default function ExpensesPage() {
       setCategoryId("");
       setNewCategory("");
       setAuthorizationPin("");
-      setEarlyExpenseModalOpen(false);
       setNotice(
         settleImmediately
           ? "Egreso anticipado registrado correctamente."
@@ -138,11 +138,39 @@ export default function ExpensesPage() {
     }
   }
 
-  async function saveEarlyExpense() {
-    await saveExpense(
-      { preventDefault: () => undefined } as FormEvent<HTMLFormElement>,
-      true,
-    );
+  async function settleExpense() {
+    if (!authorizing) return;
+    setError("");
+    setSaving(true);
+    try {
+      const token = sessionStorage.getItem("coffee_gosen_access_token");
+      const response = await fetch(
+        `${apiUrl}/expenses/${authorizing.id}/settle?authorization_pin=${encodeURIComponent(authorizationPin)}`,
+        {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        },
+      );
+      const result = await response.json();
+      if (!response.ok)
+        throw new Error(result.detail ?? "No fue posible registrar el egreso.");
+      setExpenses((current) =>
+        current.map((expense) =>
+          expense.id === authorizing.id ? (result as Expense) : expense,
+        ),
+      );
+      setAuthorizing(null);
+      setAuthorizationPin("");
+      setNotice("Egreso registrado correctamente en el saldo.");
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "No fue posible registrar el egreso.",
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function deleteExpense() {
@@ -181,6 +209,64 @@ export default function ExpensesPage() {
     }
   }
 
+  async function updateExpense(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editing) return;
+    setError("");
+    setNotice("");
+    setSaving(true);
+    try {
+      const token = sessionStorage.getItem("coffee_gosen_access_token");
+      const response = await fetch(`${apiUrl}/expenses/${editing.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          amount: Number(amount),
+          payment_method: method,
+          category_id: Number(categoryId),
+          product: product.trim() || null,
+          observation: observation.trim(),
+          settle_immediately: false,
+          authorization_pin: null,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok)
+        throw new Error(result.detail ?? "No fue posible actualizar el egreso.");
+      setExpenses((current) =>
+        current.map((expense) =>
+          expense.id === editing.id ? (result as Expense) : expense,
+        ),
+      );
+      setEditing(null);
+      setNotice("Egreso actualizado correctamente.");
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "No fue posible actualizar el egreso.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function startEditing(expense: Expense) {
+    const category = categories.find(
+      (candidate) => candidate.name === expense.category_name,
+    );
+    setAmount(String(expense.amount));
+    setMethod(expense.payment_method);
+    setProduct(expense.product ?? "");
+    setObservation(expense.observation);
+    setCategoryId(category ? String(category.id) : "");
+    setEditing(expense);
+    setError("");
+  }
+
   async function settlePendingExpenses() {
     setError("");
     setSaving(true);
@@ -212,6 +298,15 @@ export default function ExpensesPage() {
   }
 
   const pendingExpenses = expenses.filter((expense) => !expense.settled_at);
+  const canAuthorize = (expense: Expense) => {
+    const category = expense.category_name.toLowerCase();
+    return (
+      category.includes("insumo") ||
+      category.includes("desech") ||
+      category.includes("limpieza") ||
+      category.includes("aseo")
+    );
+  };
   const isLastDayOfMonth =
     new Date().getDate() ===
     new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
@@ -229,7 +324,7 @@ export default function ExpensesPage() {
           {error}
         </p>
       )}
-      {earlyExpenseModalOpen && (
+      {authorizing && (
         <div className="fixed inset-0 z-30 grid place-items-center bg-[var(--ink)]/40 p-4">
           <div
             role="dialog"
@@ -239,18 +334,17 @@ export default function ExpensesPage() {
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="font-semibold">
-                  Ingresar egreso antes de fin de mes
+                  Registrar egreso antes de fin de mes
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-                  Este egreso se aplicará inmediatamente al saldo. Requiere
-                  autorización.
+                  Este egreso se aplicará inmediatamente al saldo. Requiere autorización.
                 </p>
               </div>
               <button
                 type="button"
                 aria-label="Cerrar"
                 onClick={() => {
-                  setEarlyExpenseModalOpen(false);
+                  setAuthorizing(null);
                   setAuthorizationPin("");
                 }}
               >
@@ -273,7 +367,7 @@ export default function ExpensesPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setEarlyExpenseModalOpen(false);
+                  setAuthorizing(null);
                   setAuthorizationPin("");
                 }}
                 className="min-h-11 border border-[var(--line)] px-4 text-sm font-semibold"
@@ -283,13 +377,114 @@ export default function ExpensesPage() {
               <button
                 type="button"
                 disabled={saving || authorizationPin.length < 4}
-                onClick={() => void saveEarlyExpense()}
+                onClick={() => void settleExpense()}
                 className="min-h-11 bg-[var(--blue-main)] px-4 text-sm font-semibold text-white disabled:opacity-60"
               >
-                {saving ? "Guardando..." : "Autorizar y registrar"}
+                {saving ? "Registrando..." : "Autorizar y registrar"}
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {editing && (
+        <div className="fixed inset-0 z-30 grid place-items-center bg-[var(--ink)]/40 p-4">
+          <form
+            onSubmit={(event) => void updateExpense(event)}
+            className="w-full max-w-md border border-[var(--ink)] bg-white p-6 shadow-2xl"
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="font-semibold">Editar egreso</h2>
+                <p className="mt-1 text-sm text-[var(--muted)]">
+                  Corrige el valor, la categoría u otro dato del registro.
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-label="Cerrar"
+                onClick={() => setEditing(null)}
+              >
+                <X size={19} />
+              </button>
+            </div>
+            <label className="mt-5 block text-sm font-semibold">
+              Valor
+              <input
+                required
+                min="1"
+                step="0.01"
+                type="number"
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+                className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal"
+              />
+            </label>
+            <label className="mt-4 block text-sm font-semibold">
+              Categoría
+              <select
+                required
+                value={categoryId}
+                onChange={(event) => setCategoryId(event.target.value)}
+                className="mt-2 min-h-11 w-full border border-[var(--line)] bg-white px-3 font-normal"
+              >
+                <option value="">Selecciona una categoría</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="mt-4 block text-sm font-semibold">
+              Método
+              <select
+                value={method}
+                onChange={(event) =>
+                  setMethod(event.target.value as "CASH" | "NEQUI")
+                }
+                className="mt-2 min-h-11 w-full border border-[var(--line)] bg-white px-3 font-normal"
+              >
+                <option value="CASH">Efectivo</option>
+                <option value="NEQUI">Nequi</option>
+              </select>
+            </label>
+            <label className="mt-4 block text-sm font-semibold">
+              Producto
+              <input
+                value={product}
+                onChange={(event) => setProduct(event.target.value)}
+                maxLength={180}
+                className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal"
+              />
+            </label>
+            <label className="mt-4 block text-sm font-semibold">
+              Observación
+              <textarea
+                required
+                minLength={2}
+                value={observation}
+                onChange={(event) => setObservation(event.target.value)}
+                rows={3}
+                className="mt-2 w-full border border-[var(--line)] px-3 py-3 font-normal"
+              />
+            </label>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setEditing(null)}
+                className="min-h-11 border border-[var(--line)] px-4 text-sm font-semibold"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="min-h-11 bg-[var(--blue-main)] px-4 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {saving ? "Guardando..." : "Guardar cambios"}
+              </button>
+            </div>
+          </form>
         </div>
       )}
       {notice && (
@@ -428,13 +623,6 @@ export default function ExpensesPage() {
           className="inline-flex min-h-10 items-center gap-2 bg-[var(--blue-main)] px-4 text-sm font-semibold text-white disabled:opacity-50"
         >
           Registrar egreso de cierre ({pendingExpenses.length})
-        </button>
-        <button
-          type="button"
-          onClick={() => setEarlyExpenseModalOpen(true)}
-          className="inline-flex min-h-10 items-center gap-2 border border-amber-600 px-4 text-sm font-semibold text-amber-800"
-        >
-          Ingresar egreso antes de fin de mes
         </button>
       </div>
       <div className="grid w-full min-w-0 grid-cols-2 items-start gap-3 xl:gap-6 xl:grid-cols-[minmax(300px,360px)_minmax(0,1fr)] [&>form]:min-w-0 [&>section]:min-w-0">
@@ -576,14 +764,38 @@ export default function ExpensesPage() {
                         {money(Number(expense.amount))}
                       </td>
                       <td className="p-4">
-                        <button
-                          type="button"
-                          title="Eliminar egreso"
-                          onClick={() => setDeleting(expense)}
-                          className="grid size-10 place-items-center border border-red-200 text-red-700"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        <div className="flex gap-2">
+                          {!expense.settled_at && canAuthorize(expense) && (
+                            <button
+                              type="button"
+                              title="Registrar egreso antes de fin de mes"
+                              onClick={() => {
+                                setAuthorizing(expense);
+                                setAuthorizationPin("");
+                                setError("");
+                              }}
+                              className="grid size-10 place-items-center border border-amber-600 text-amber-800"
+                            >
+                              <KeyRound size={16} />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            title="Editar egreso"
+                            onClick={() => startEditing(expense)}
+                            className="grid size-10 place-items-center border border-[var(--line)] text-[var(--blue-main)]"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            title="Eliminar egreso"
+                            onClick={() => setDeleting(expense)}
+                            className="grid size-10 place-items-center border border-red-200 text-red-700"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

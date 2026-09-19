@@ -32,9 +32,22 @@ def register_purchase(
     product.stock += payload.quantity
     product.acquisition_cost = payload.unit_cost
 
-    expense_category = database.scalar(select(ExpenseCategory).where(ExpenseCategory.name.ilike("Aseo")).limit(1))
+    product_category_name = product.category.name.strip().lower()
+    if "desech" in product_category_name:
+        expense_category_name = "Desechables"
+    elif "limpieza" in product_category_name:
+        expense_category_name = "Limpieza"
+    elif "insumo" in product_category_name or "aseo" in product_category_name:
+        expense_category_name = "Insumos"
+    else:
+        expense_category_name = product.category.name.strip()
+    expense_category = database.scalar(
+        select(ExpenseCategory)
+        .where(ExpenseCategory.name.ilike(expense_category_name))
+        .limit(1)
+    )
     if expense_category is None:
-        expense_category = ExpenseCategory(name="Aseo")
+        expense_category = ExpenseCategory(name=expense_category_name)
         database.add(expense_category)
         database.flush()
 
@@ -56,6 +69,7 @@ def register_purchase(
         concept=f"Compra de {product.name}",
         payment_method=payload.payment_method,
         expense_category_id=expense_category.id,
+        product=product.name,
         observation=payload.observation or f"Compra de {product.name}",
     )
     database.add(financial_movement)
