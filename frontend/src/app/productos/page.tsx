@@ -127,29 +127,39 @@ export default function ProductsPage() {
 
   async function loadCatalog() {
     const token = sessionStorage.getItem("coffee_gosen_access_token");
+    if (!token) {
+      throw new Error("La sesión no está activa. Vuelve a iniciar sesión.");
+    }
     const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
-    const [productsResponse, categoriesResponse, startedResponse] = await Promise.all([
-      fetch(`${apiUrl}/products`, { headers }),
-      fetch(`${apiUrl}/categories`, { headers }),
-      fetch(`${apiUrl}/inventory/started`, { headers }),
+    const loadJson = async <T,>(path: string, label: string): Promise<T> => {
+      let response: Response;
+      try {
+        response = await fetch(`${apiUrl}${path}`, { headers });
+      } catch {
+        throw new Error(`No se pudo conectar con ${label} (${apiUrl}${path}).`);
+      }
+      const text = await response.text();
+      let result: unknown = {};
+      try {
+        result = text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error(`${label} respondió con un formato no válido (${response.status}).`);
+      }
+      if (!response.ok) {
+        throw new Error(apiError(result as { detail?: string | { msg?: string }[] }, `No fue posible cargar ${label}.`));
+      }
+      return result as T;
+    };
+
+    const [productsResult, categoriesResult, startedResult] = await Promise.all([
+      loadJson<Product[]>("/products", "productos"),
+      loadJson<Category[]>("/categories", "categorías"),
+      loadJson<Product[]>("/inventory/started", "productos comenzados"),
     ]);
-    const productsResult = await productsResponse.json();
-    const categoriesResult = await categoriesResponse.json();
-    const startedResult = await startedResponse.json();
 
-    if (!productsResponse.ok) {
-      throw new Error(apiError(productsResult, "No fue posible cargar los productos."));
-    }
-    if (!categoriesResponse.ok) {
-      throw new Error(apiError(categoriesResult, "No fue posible cargar las categorías."));
-    }
-    if (!startedResponse.ok) {
-      throw new Error(apiError(startedResult, "No fue posible cargar los productos comenzados."));
-    }
-
-    setProducts(productsResult as Product[]);
-    setCategories(categoriesResult as Category[]);
-    setStartedProducts(startedResult as Product[]);
+    setProducts(productsResult);
+    setCategories(categoriesResult);
+    setStartedProducts(startedResult);
   }
 
   useEffect(() => {
