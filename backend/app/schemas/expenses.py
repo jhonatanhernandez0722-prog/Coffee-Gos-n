@@ -19,6 +19,8 @@ class ExpenseCreate(BaseModel):
     category_id: int = Field(gt=0)
     product: str | None = Field(default=None, max_length=180)
     observation: str = Field(min_length=2, max_length=500)
+    settle_immediately: bool = False
+    authorization_pin: str | None = Field(default=None, min_length=4, max_length=20)
 
 
 class ExpenseResponse(BaseModel):

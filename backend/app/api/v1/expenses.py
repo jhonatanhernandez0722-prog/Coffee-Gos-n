@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.api.v1.dependencies import require_admin
 from app.core.permissions import require_section
 from app.core.security import verify_password
+from app.core.config import settings
 from app.db.session import get_db
 from app.models import ExpenseCategory, FinancialMovement, User
 from app.schemas.expenses import ExpenseCategoryCreate, ExpenseCategoryResponse, ExpenseCreate, ExpenseResponse, ExpensesResponse, SettleExpensesResponse
@@ -45,7 +46,9 @@ def create_expense(payload: ExpenseCreate, database: Session = Depends(get_db), 
     category = database.get(ExpenseCategory, payload.category_id)
     if category is None or not category.is_active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La categoría no está disponible")
-    movement = FinancialMovement(user_id=current_user.id, movement_type="EXPENSE", amount=payload.amount, concept=payload.observation.strip(), payment_method=payload.payment_method, expense_category_id=category.id, product=payload.product.strip() if payload.product else None, observation=payload.observation.strip())
+    if payload.settle_immediately and payload.authorization_pin != settings.aseo_pin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="El PIN de autorización no es válido")
+    movement = FinancialMovement(user_id=current_user.id, movement_type="EXPENSE", amount=payload.amount, concept=payload.observation.strip(), payment_method=payload.payment_method, expense_category_id=category.id, product=payload.product.strip() if payload.product else None, observation=payload.observation.strip(), settled_at=datetime.now(timezone.utc) if payload.settle_immediately else None)
     database.add(movement)
     database.commit()
     database.refresh(movement)
