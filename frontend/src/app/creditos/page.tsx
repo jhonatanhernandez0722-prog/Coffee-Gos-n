@@ -25,8 +25,7 @@ const money = (value: number) =>
   new Intl.NumberFormat("es-CO", {
     style: "currency",
     currency: "COP",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 0,
   }).format(value);
 const mediaUrl = (path: string) =>
   /^https?:\/\//i.test(path) ? path : `${apiUrl.replace("/api/v1", "")}${path}`;
@@ -341,12 +340,21 @@ export default function CreditsPage() {
               Monto
               <input
                 required
-                min="0.01"
+                min="1"
                 max={Number(paymentTarget.pending_amount)}
-                step="0.01"
+                step="1"
+                inputMode="numeric"
                 type="number"
                 value={paymentAmount}
-                onChange={(event) => setPaymentAmount(event.target.value)}
+                onKeyDown={(event) => {
+                  if ([".", ",", "e", "E", "+", "-"].includes(event.key)) {
+                    event.preventDefault();
+                  }
+                }}
+                onChange={(event) => {
+                  const sanitized = event.target.value.replace(/[^0-9]/g, "");
+                  setPaymentAmount(sanitized);
+                }}
                 className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal"
               />
             </label>
