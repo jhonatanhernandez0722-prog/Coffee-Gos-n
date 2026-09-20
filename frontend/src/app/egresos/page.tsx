@@ -338,15 +338,6 @@ export default function ExpensesPage() {
   }
 
   const pendingExpenses = expenses.filter((expense) => !expense.settled_at);
-  const canAuthorize = (expense: Expense) => {
-    const category = expense.category_name.toLowerCase();
-    return (
-      category.includes("insumo") ||
-      category.includes("desech") ||
-      category.includes("limpieza") ||
-      category.includes("aseo")
-    );
-  };
   const isLastDayOfMonth =
     new Date().getDate() ===
     new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
@@ -845,7 +836,7 @@ export default function ExpensesPage() {
                       </td>
                       <td className="p-4">
                         <div className="flex gap-2">
-                          {!expense.settled_at && canAuthorize(expense) && (
+                          {!expense.settled_at && (
                             <button
                               type="button"
                               title="Registrar egreso antes de fin de mes"
