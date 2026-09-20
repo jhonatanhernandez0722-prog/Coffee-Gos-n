@@ -12,7 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
-import { apiUrl } from "@/lib/api";
+import { apiUrl, userFacingError } from "@/lib/api";
 import { downloadExcel } from "@/lib/excel";
 
 type Seller = {
@@ -84,7 +84,7 @@ export default function SellersPage() {
   useEffect(() => {
     Promise.resolve()
       .then(loadSellers)
-      .catch((requestError: Error) => setError(requestError.message));
+      .catch((requestError: Error) => setError(userFacingError(requestError, "No fue posible cargar los usuarios.")));
   }, []);
 
   function resetForm() {
@@ -166,7 +166,7 @@ export default function SellersPage() {
     } catch (requestError) {
       setError(
         requestError instanceof Error
-          ? requestError.message
+          ? userFacingError(requestError, "No fue posible guardar el usuario.")
           : "No fue posible guardar el usuario.",
       );
     } finally {

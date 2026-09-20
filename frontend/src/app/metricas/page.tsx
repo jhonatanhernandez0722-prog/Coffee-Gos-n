@@ -10,7 +10,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
-import { apiUrl } from "@/lib/api";
+import { apiUrl, userFacingError } from "@/lib/api";
 import { downloadExcel } from "@/lib/excel";
 
 type Point = { label: string; value: number };
@@ -315,7 +315,7 @@ export default function MetricsPage() {
         return result as Metrics;
       })
       .then(setData)
-      .catch((requestError: Error) => setError(requestError.message));
+      .catch((requestError: Error) => setError(userFacingError(requestError, "No fue posible cargar las métricas.")));
   }, [dateFrom, dateTo]);
   return (
     <AdminPage

@@ -10,3 +10,9 @@ export const apiUrl = configuredApiUrl && /^https?:\/\//i.test(configuredApiUrl)
     : developmentApiUrl;
 
 export const apiBaseUrl = apiUrl.replace(/\/api\/v1$/, "");
+
+export function userFacingError(error: unknown, fallback: string): string {
+  const message = error instanceof Error ? error.message : "";
+  if (/failed to fetch|networkerror|load failed/i.test(message)) return fallback;
+  return message || fallback;
+}

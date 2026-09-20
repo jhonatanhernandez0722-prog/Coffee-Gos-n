@@ -4,7 +4,7 @@ import { ChangeEvent, useEffect, useState } from "react";
 import Image from "next/image";
 import { ImagePlus, QrCode, Trash2, Upload } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
-import { apiUrl } from "@/lib/api";
+import { apiUrl, userFacingError } from "@/lib/api";
 
 export default function PaymentQrPage() {
   const [qrImage, setQrImage] = useState("");
@@ -18,7 +18,7 @@ export default function PaymentQrPage() {
         if (!response.ok) throw new Error(result.detail ?? "No fue posible cargar el QR.");
         setQrImage(result.image_data ?? "");
       })
-      .catch((requestError: Error) => setError(requestError.message));
+      .catch((requestError: Error) => setError(userFacingError(requestError, "No fue posible cargar el código QR.")));
   }, []);
 
   async function handleUpload(event: ChangeEvent<HTMLInputElement>) {

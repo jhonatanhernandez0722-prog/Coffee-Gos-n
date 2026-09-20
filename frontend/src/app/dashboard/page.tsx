@@ -27,7 +27,7 @@ import {
   WalletCards,
   Volume2,
 } from "lucide-react";
-import { apiUrl } from "@/lib/api";
+import { apiUrl, userFacingError } from "@/lib/api";
 import { downloadExcel } from "@/lib/excel";
 
 type DashboardSummary = {
@@ -269,7 +269,7 @@ export default function DashboardPage() {
         return result as DashboardSummary;
       })
       .then(setSummary)
-      .catch((requestError: Error) => setError(requestError.message))
+      .catch((requestError: Error) => setError(userFacingError(requestError, "No fue posible cargar el resumen.")))
       .finally(() => setIsLoading(false));
   }, [router, selectedDate]);
 
@@ -287,7 +287,7 @@ export default function DashboardPage() {
         return result as MonthlyReport;
       })
       .then(setMonthlyReport)
-      .catch((requestError: Error) => setError(requestError.message));
+      .catch((requestError: Error) => setError(userFacingError(requestError, "No fue posible cargar el informe mensual.")));
   }, [reportMonth]);
 
   useEffect(() => {

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Banknote, CalendarDays, CircleDollarSign, CreditCard } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
-import { apiUrl } from "@/lib/api";
+import { apiUrl, userFacingError } from "@/lib/api";
 
 type Reconciliation = { date: string; cash: number; bank: number; receivables: number; total: number };
 const money = (value: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(value);
@@ -16,7 +16,7 @@ export default function CashReconciliationPage() {
     const token = sessionStorage.getItem("coffee_gosen_access_token");
     fetch(`${apiUrl}/financial-reports/cash-reconciliation?report_date=${date}`, { headers: token ? { Authorization: `Bearer ${token}` } : undefined })
       .then(async (response) => { const result = await response.json(); if (!response.ok) throw new Error(result.detail ?? "No fue posible cargar el arqueo."); return result as Reconciliation; })
-      .then(setData).catch((requestError: Error) => setError(requestError.message));
+      .then(setData).catch((requestError: Error) => setError(userFacingError(requestError, "No fue posible cargar el arqueo.")));
   }, [date]);
   return <AdminPage title="Arqueo de Caja" description="Consulta el cierre financiero de la jornada con los saldos disponibles y las cuentas por cobrar.">
     {error && <p role="alert" className="mb-6 border border-red-200 bg-red-50 p-5 text-sm text-red-700">{error}</p>}

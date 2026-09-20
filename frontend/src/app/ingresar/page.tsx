@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Banknote, Check, Delete, History, Pencil, Receipt, Trash2 } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
-import { apiUrl } from "@/lib/api";
+import { apiUrl, userFacingError } from "@/lib/api";
 
 type IncomeType = "DONATION" | "OLD_INCOME" | "CONTRIBUTION" | "OTHER";
 type Income = { id: number; amount: number; person_name: string | null; income_type: IncomeType; payment_method: "CASH" | "NEQUI"; occurred_on: string; description: string; created_at: string };
@@ -31,7 +31,7 @@ export default function IngresarPage() {
     if (!response.ok) throw new Error(result.detail ?? "No fue posible cargar los ingresos.");
     setIncomes(result.incomes as Income[]);
   }
-  useEffect(() => { Promise.resolve().then(loadIncomes).catch((requestError: Error) => setError(requestError.message)); }, []);
+  useEffect(() => { Promise.resolve().then(loadIncomes).catch((requestError: Error) => setError(userFacingError(requestError, "No fue posible cargar los ingresos."))); }, []);
 
   function pressKey(key: string) {
     if (key === "clear") return setAmount("");
@@ -55,7 +55,7 @@ export default function IngresarPage() {
       if (!response.ok) throw new Error(result.detail ?? "No fue posible guardar el ingreso.");
       setNotice(editing ? "Ingreso actualizado correctamente." : "Ingreso registrado correctamente.");
       reset(); await loadIncomes();
-    } catch (requestError) { setError(requestError instanceof Error ? requestError.message : "No fue posible guardar el ingreso."); } finally { setSaving(false); }
+    } catch (requestError) { setError(userFacingError(requestError, "No fue posible guardar el ingreso.")); } finally { setSaving(false); }
   }
   async function removeIncome(id: number) {
     if (!window.confirm("¿Eliminar este ingreso? Esta acción no se puede deshacer.")) return;

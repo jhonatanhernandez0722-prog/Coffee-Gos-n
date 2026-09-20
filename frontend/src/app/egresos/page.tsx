@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Banknote, Download, KeyRound, Pencil, Plus, ReceiptText, Trash2, X } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
-import { apiUrl } from "@/lib/api";
+import { apiUrl, userFacingError } from "@/lib/api";
 import { downloadExcel } from "@/lib/excel";
 
 type Category = { id: number; name: string; is_active: boolean };
@@ -67,7 +67,7 @@ export default function ExpensesPage() {
   useEffect(() => {
     Promise.resolve()
       .then(loadData)
-      .catch((requestError: Error) => setError(requestError.message));
+      .catch((requestError: Error) => setError(userFacingError(requestError, "No fue posible cargar los egresos.")));
   }, []);
   function exportExpenses() {
     downloadExcel(
@@ -130,9 +130,7 @@ export default function ExpensesPage() {
       );
     } catch (requestError) {
       setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "No fue posible registrar el egreso.",
+        userFacingError(requestError, "No fue posible registrar el egreso."),
       );
     } finally {
       setSaving(false);
@@ -169,9 +167,7 @@ export default function ExpensesPage() {
       setNotice(`Categoría "${category.name}" creada correctamente.`);
     } catch (requestError) {
       setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "No fue posible crear la categoría.",
+        userFacingError(requestError, "No fue posible crear la categoría."),
       );
     } finally {
       setSaving(false);
@@ -204,9 +200,7 @@ export default function ExpensesPage() {
       setNotice("Egreso registrado correctamente en el saldo.");
     } catch (requestError) {
       setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "No fue posible registrar el egreso.",
+        userFacingError(requestError, "No fue posible registrar el egreso."),
       );
     } finally {
       setSaving(false);
@@ -240,9 +234,7 @@ export default function ExpensesPage() {
       setNotice("Egreso eliminado correctamente.");
     } catch (requestError) {
       setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "No fue posible eliminar el egreso.",
+        userFacingError(requestError, "No fue posible eliminar el egreso."),
       );
     } finally {
       setSaving(false);
@@ -285,9 +277,7 @@ export default function ExpensesPage() {
       setNotice("Egreso actualizado correctamente.");
     } catch (requestError) {
       setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "No fue posible actualizar el egreso.",
+        userFacingError(requestError, "No fue posible actualizar el egreso."),
       );
     } finally {
       setSaving(false);
@@ -328,9 +318,7 @@ export default function ExpensesPage() {
       await loadData();
     } catch (requestError) {
       setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "No fue posible restar los egresos pendientes.",
+        userFacingError(requestError, "No fue posible restar los egresos pendientes."),
       );
     } finally {
       setSaving(false);

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Banknote, Gift, History } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
-import { apiUrl } from "@/lib/api";
+import { apiUrl, userFacingError } from "@/lib/api";
 
 type Donation = { id: number; amount: number; person_name: string | null; payment_method: "CASH" | "NEQUI"; occurred_on: string; description: string; created_at: string };
 const money = (value: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(value);
@@ -17,7 +17,7 @@ export default function DonationsPage() {
     fetch(`${apiUrl}/incomes/donations`, { headers: token ? { Authorization: `Bearer ${token}` } : undefined })
       .then(async (response) => { const result = await response.json(); if (!response.ok) throw new Error(result.detail ?? "No fue posible cargar las donaciones."); return result as { incomes: Donation[]; total: number }; })
       .then((result) => { setDonations(result.incomes); setTotal(Number(result.total)); })
-      .catch((requestError: Error) => setError(requestError.message));
+      .catch((requestError: Error) => setError(userFacingError(requestError, "No fue posible cargar las donaciones.")));
   }, []);
   return <AdminPage title="Donaciones" description="Consulta las donaciones registradas desde la caja de ingresos, sin duplicarlas como ventas.">
     {error && <p role="alert" className="mb-5 border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</p>}

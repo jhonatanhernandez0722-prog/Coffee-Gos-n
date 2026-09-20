@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Download, Minus, Plus, Printer, Search, ShoppingBag, Trash2, X } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
-import { apiUrl } from "@/lib/api";
+import { apiUrl, userFacingError } from "@/lib/api";
 import { downloadExcel } from "@/lib/excel";
 
 type Product = { id: number; name: string; sale_price: number; stock: number; unit: "KG" | "ML" | "UNIT" | "PAQUETE"; is_combo?: boolean; components?: { product_id: number; product_name?: string; quantity: number }[]; content_quantity?: number | null; content_unit?: "G" | "KG" | "ML" | "L" | "UNIT" | null; image_url?: string | null };
@@ -62,7 +62,7 @@ export default function ComandaPage() {
     fetch(`${apiUrl}/products?saleable_only=true`, { headers: token ? { Authorization: `Bearer ${token}` } : undefined })
       .then(async (response) => { const result = await response.json(); if (!response.ok) throw new Error(result.detail ?? "No fue posible cargar el catálogo."); return result as Product[]; })
       .then(setProducts)
-      .catch((requestError: Error) => setError(requestError.message));
+      .catch((requestError: Error) => setError(userFacingError(requestError, "No fue posible cargar los productos.")));
   }, []);
 
   useEffect(() => {
@@ -109,7 +109,7 @@ export default function ComandaPage() {
       const productsResponse = await fetch(`${apiUrl}/products?saleable_only=true`, { headers: token ? { Authorization: `Bearer ${token}` } : undefined });
       if (productsResponse.ok) setProducts(await productsResponse.json() as Product[]);
     } catch (requestError) {
-      setError(requestError instanceof TypeError && requestError.message.toLowerCase().includes("fetch") ? `No se pudo conectar con el backend (${apiUrl}). Verifica el deployment de la API.` : requestError instanceof Error ? requestError.message : "No fue posible confirmar la venta.");
+      setError(userFacingError(requestError, `No se pudo conectar con el backend (${apiUrl}). Verifica el deployment de la API.`));
     } finally { setSaving(false); }
   }
 

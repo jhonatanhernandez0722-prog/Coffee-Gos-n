@@ -3,7 +3,7 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { CreditCard, Download, HandCoins, Trash2, X } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
-import { apiUrl } from "@/lib/api";
+import { apiUrl, userFacingError } from "@/lib/api";
 import { downloadExcel } from "@/lib/excel";
 
 type CreditProduct = { name: string; quantity: number };
@@ -59,7 +59,7 @@ export default function CreditsPage() {
   useEffect(() => {
     Promise.resolve()
       .then(loadCredits)
-      .catch((requestError: Error) => setError(requestError.message));
+      .catch((requestError: Error) => setError(userFacingError(requestError, "No fue posible cargar los créditos.")));
   }, []);
 
   function openPayment(credit: Credit, fullPayment: boolean) {
@@ -107,7 +107,7 @@ export default function CreditsPage() {
     } catch (requestError) {
       setError(
         requestError instanceof Error
-          ? requestError.message
+          ? userFacingError(requestError, "No fue posible registrar el abono.")
           : "No fue posible registrar el pago.",
       );
     } finally {
@@ -127,7 +127,7 @@ export default function CreditsPage() {
       if (!response.ok) throw new Error(result?.detail ?? "No fue posible eliminar el crédito.");
       setCredits((current) => current.filter((item) => item.id !== credit.id));
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "No fue posible eliminar el crédito.");
+      setError(userFacingError(requestError, "No fue posible eliminar el crédito."));
     }
   }
 

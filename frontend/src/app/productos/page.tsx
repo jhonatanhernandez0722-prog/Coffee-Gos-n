@@ -4,7 +4,7 @@ import { FormEvent, KeyboardEvent, useEffect, useState } from "react";
 import Image from "next/image";
 import { ArchiveRestore, Download, Package, PackageX, Pencil, Plus, Search, X } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
-import { apiUrl } from "@/lib/api";
+import { apiUrl, userFacingError } from "@/lib/api";
 import { downloadExcel } from "@/lib/excel";
 
 type Product = {
@@ -166,7 +166,7 @@ export default function ProductsPage() {
   useEffect(() => {
     Promise.resolve()
       .then(loadCatalog)
-      .catch((requestError: Error) => setError(requestError.message))
+      .catch((requestError: Error) => setError(userFacingError(requestError, "No fue posible cargar el catálogo.")))
       .finally(() => setLoading(false));
   }, []);
 
@@ -258,7 +258,7 @@ export default function ProductsPage() {
 
       setPurchaseTarget(null);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "No fue posible registrar la compra.");
+      setError(userFacingError(requestError, "No fue posible registrar la compra."));
     } finally {
       setSaving(false);
     }
@@ -434,7 +434,7 @@ export default function ProductsPage() {
       setProducts((current) => [...current, savedProduct]);
       setShowForm(false);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "No fue posible guardar el producto.");
+      setError(userFacingError(requestError, "No fue posible guardar el producto."));
     } finally {
       setSaving(false);
     }
@@ -455,7 +455,7 @@ export default function ProductsPage() {
       if (!response.ok) throw new Error(apiError(result, "No fue posible eliminar el producto."));
       setProducts((current) => current.filter((item) => item.id !== product.id));
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "No fue posible eliminar el producto.");
+      setError(userFacingError(requestError, "No fue posible eliminar el producto."));
     } finally {
       setSaving(false);
     }
@@ -488,7 +488,7 @@ export default function ProductsPage() {
       if (!response.ok) throw new Error(apiError(result, "No fue posible cargar los productos deshabilitados."));
       setDisabledProducts((result as Product[]).filter((product) => !product.is_active));
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "No fue posible cargar los productos deshabilitados.");
+      setError(userFacingError(requestError, "No fue posible cargar los productos deshabilitados."));
     } finally {
       setDisabledLoading(false);
     }
@@ -505,7 +505,7 @@ export default function ProductsPage() {
       setDisabledProducts((current) => current.filter((item) => item.id !== product.id));
       await loadCatalog();
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "No fue posible habilitar el producto.");
+      setError(userFacingError(requestError, "No fue posible habilitar el producto."));
     } finally {
       setSaving(false);
     }
@@ -527,7 +527,7 @@ export default function ProductsPage() {
       setProducts((current) => current.map((item) => (item.id === product.id ? (result as Product) : item)));
 
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "No fue posible restablecer el stock.");
+      setError(userFacingError(requestError, "No fue posible restablecer el stock."));
     } finally {
       setSaving(false);
     }
@@ -583,7 +583,7 @@ export default function ProductsPage() {
       setTakeTarget(null);
 
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "No fue posible registrar la toma.");
+      setError(userFacingError(requestError, "No fue posible registrar la toma."));
     } finally {
       setSaving(false);
     }
@@ -621,7 +621,7 @@ export default function ProductsPage() {
       setProducts((current) => current.map((item) => item.id === damageTarget.id ? { ...item, stock: Number(result.stock_after) } : item));
       setDamageTarget(null);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "No fue posible reportar el daño.");
+      setError(userFacingError(requestError, "No fue posible reportar el daño."));
     } finally {
       setSaving(false);
     }

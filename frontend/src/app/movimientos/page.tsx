@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Download, Pencil, Trash2 } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
-import { apiUrl } from "@/lib/api";
+import { apiUrl, userFacingError } from "@/lib/api";
 
 type Movement = {
   id: number;
@@ -113,7 +113,7 @@ export default function MovementsPage() {
         return result.movements as Movement[];
       })
       .then(setMovements)
-      .catch((requestError: Error) => setError(requestError.message));
+      .catch((requestError: Error) => setError(userFacingError(requestError, "No fue posible cargar los movimientos.")));
   }, [dateFrom, dateTo, movementType]);
 
   useEffect(() => {
@@ -219,7 +219,7 @@ export default function MovementsPage() {
     } catch (requestError) {
       setError(
         requestError instanceof Error
-          ? requestError.message
+          ? userFacingError(requestError, "No fue posible editar el movimiento.")
           : "No fue posible actualizar el movimiento.",
       );
     } finally {
@@ -257,7 +257,7 @@ export default function MovementsPage() {
     } catch (requestError) {
       setError(
         requestError instanceof Error
-          ? requestError.message
+          ? userFacingError(requestError, "No fue posible eliminar el movimiento.")
           : "No fue posible eliminar el movimiento.",
       );
     }
