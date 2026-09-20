@@ -27,7 +27,10 @@ def user_sections(user: User) -> list[str]:
         return list(SECTIONS)
     if user.role == "VIEWER":
         return list(SECTIONS)
-    return sorted({permission.section for permission in user.permissions if permission.section in SECTIONS})
+    sections = {permission.section for permission in user.permissions if permission.section in SECTIONS}
+    if user.role == "SELLER":
+        sections.update({"productos", "egresos"})
+    return sorted(sections)
 
 
 def require_section(section: str):
