@@ -183,19 +183,19 @@ def update_product(
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Los productos por unidad o paquete solo aceptan cantidades enteras")
     for field, value in values.items():
         setattr(product, field, value)
-    if component_payload is not None:
-        replace_components(product, validate_components(product.id, effective_is_combo, component_payload, database), database)
-    elif not effective_is_combo:
-        replace_components(product, [], database)
     try:
+        if component_payload is not None:
+            replace_components(product, validate_components(product.id, effective_is_combo, component_payload, database), database)
+        elif not effective_is_combo:
+            replace_components(product, [], database)
         database.commit()
+        database.refresh(product)
     except IntegrityError:
         database.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No se pudo actualizar la composición del combo por una restricción de la base de datos") from None
     except SQLAlchemyError:
         database.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="La base de datos no pudo actualizar la composición del combo") from None
-    database.refresh(product)
     return product
 
 
