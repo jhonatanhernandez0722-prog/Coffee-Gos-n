@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { Banknote, Download, KeyRound, Pencil, ReceiptText, Trash2, X } from "lucide-react";
+import { Banknote, Download, KeyRound, Pencil, Plus, ReceiptText, Trash2, X } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
 import { apiUrl } from "@/lib/api";
 import { downloadExcel } from "@/lib/excel";
@@ -29,6 +29,7 @@ export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categoryId, setCategoryId] = useState("");
   const [newCategory, setNewCategory] = useState("");
+  const [addingCategory, setAddingCategory] = useState(false);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<"CASH" | "NEQUI">("CASH");
   const [product, setProduct] = useState("");
@@ -132,6 +133,45 @@ export default function ExpensesPage() {
         requestError instanceof Error
           ? requestError.message
           : "No fue posible registrar el egreso.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function createCategory() {
+    const categoryName = newCategory.trim();
+    if (categoryName.length < 2) {
+      setError("La categoría debe tener al menos 2 caracteres.");
+      return;
+    }
+    setError("");
+    setSaving(true);
+    try {
+      const token = sessionStorage.getItem("coffee_gosen_access_token");
+      const response = await fetch(`${apiUrl}/expenses/categories`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ name: categoryName }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.detail ?? "No fue posible crear la categoría.");
+      }
+      const category = result as Category;
+      setCategories((current) => [...current, category].sort((a, b) => a.name.localeCompare(b.name)));
+      setCategoryId(String(category.id));
+      setNewCategory("");
+      setAddingCategory(false);
+      setNotice(`Categoría "${category.name}" creada correctamente.`);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "No fue posible crear la categoría.",
       );
     } finally {
       setSaving(false);
@@ -675,22 +715,62 @@ export default function ExpensesPage() {
               className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal"
             />
           </label>
-          <label className="mt-4 block text-sm font-semibold">
-            Categoría
-            <select
-              required
-              value={categoryId}
-              onChange={(event) => setCategoryId(event.target.value)}
-              className="mt-2 min-h-11 w-full border border-[var(--line)] bg-white px-3 font-normal"
-            >
-              <option value="">Selecciona una categoría</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="mt-4 text-sm font-semibold">
+            <label htmlFor="expense-category">Categoría</label>
+            <div className="mt-2 flex gap-2">
+              <select
+                id="expense-category"
+                required
+                value={categoryId}
+                onChange={(event) => setCategoryId(event.target.value)}
+                className="min-h-11 min-w-0 flex-1 border border-[var(--line)] bg-white px-3 font-normal"
+              >
+                <option value="">Selecciona una categoría</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => {
+                  setAddingCategory((current) => !current);
+                  setError("");
+                }}
+                aria-expanded={addingCategory}
+                className="inline-flex min-h-11 shrink-0 items-center gap-1 border border-[var(--blue-main)] px-3 text-[var(--blue-main)] transition hover:bg-[var(--blue-main)] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue-main)]"
+              >
+                <Plus size={16} /> Añadir
+              </button>
+            </div>
+            {addingCategory && (
+              <div className="mt-2 flex gap-2">
+                <input
+                  autoFocus
+                  value={newCategory}
+                  onChange={(event) => setNewCategory(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void createCategory();
+                    }
+                  }}
+                  maxLength={100}
+                  placeholder="Nombre de la categoría"
+                  className="min-h-11 min-w-0 flex-1 border border-[var(--line)] px-3 font-normal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue-main)]"
+                />
+                <button
+                  type="button"
+                  onClick={() => void createCategory()}
+                  disabled={saving || newCategory.trim().length < 2}
+                  className="min-h-11 border border-[var(--blue-main)] px-3 text-sm text-[var(--blue-main)] disabled:opacity-50"
+                >
+                  {saving ? "Guardando..." : "Guardar"}
+                </button>
+              </div>
+            )}
+          </div>
           <label className="mt-4 block text-sm font-semibold">
             Observación
             <textarea

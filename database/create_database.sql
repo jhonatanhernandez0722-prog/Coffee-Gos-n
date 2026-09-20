@@ -89,11 +89,18 @@ CREATE TABLE IF NOT EXISTS inventory_movements (
     product_id      BIGINT NOT NULL REFERENCES products(id),
     user_id         BIGINT NOT NULL REFERENCES users(id),
     movement_type   VARCHAR(20) NOT NULL
-                    CHECK (movement_type IN ('PURCHASE', 'SALE', 'ADJUSTMENT', 'INTERNAL_USE')),
+                    CHECK (movement_type IN ('PURCHASE', 'SALE', 'ADJUSTMENT', 'INTERNAL_USE', 'DAMAGE')),
     quantity        NUMERIC(12, 3) NOT NULL CHECK (quantity > 0),
     stock_after     NUMERIC(12, 3) NOT NULL CHECK (stock_after >= 0),
     sale_id         BIGINT REFERENCES sales(id),
     observation     TEXT,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS expense_categories (
+    id              BIGSERIAL PRIMARY KEY,
+    name            VARCHAR(100) NOT NULL UNIQUE,
+    is_active       BOOLEAN NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -108,6 +115,7 @@ CREATE TABLE IF NOT EXISTS financial_movements (
     payment_method  VARCHAR(20),
     person_name     VARCHAR(120),
     product         VARCHAR(180),
+    expense_category_id BIGINT REFERENCES expense_categories(id),
     settled_at      TIMESTAMPTZ,
     income_type     VARCHAR(30),
     occurred_at     TIMESTAMPTZ,
@@ -153,6 +161,8 @@ CREATE INDEX IF NOT EXISTS idx_inventory_type ON inventory_movements(movement_ty
 CREATE INDEX IF NOT EXISTS idx_inventory_created_at ON inventory_movements(created_at);
 CREATE INDEX IF NOT EXISTS idx_financial_type ON financial_movements(movement_type);
 CREATE INDEX IF NOT EXISTS idx_financial_created_at ON financial_movements(created_at);
+CREATE INDEX IF NOT EXISTS idx_expense_categories_name ON expense_categories(name);
+CREATE INDEX IF NOT EXISTS idx_financial_expense_category_id ON financial_movements(expense_category_id);
 CREATE INDEX IF NOT EXISTS idx_credits_status ON credits(status);
 CREATE INDEX IF NOT EXISTS idx_credits_customer_id ON credits(customer_id);
 
