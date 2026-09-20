@@ -215,7 +215,7 @@ export default function ExpensesPage() {
 
   async function deleteExpense() {
     if (!deleting || !password.trim()) {
-      setError("Escribe tu contraseña para confirmar la eliminación.");
+      setError("Escribe tu contraseña o PIN para confirmar la eliminación.");
       return;
     }
     setError("");
@@ -548,7 +548,7 @@ export default function ExpensesPage() {
               <div>
                 <h2 className="font-semibold">Confirmar eliminación</h2>
                 <p className="mt-1 text-sm text-[var(--muted)]">
-                  Ingresa tu contraseña para borrar este egreso.
+                  Ingresa la contraseña o PIN de tu cuenta para borrar este egreso.
                 </p>
               </div>
               <button
@@ -563,7 +563,7 @@ export default function ExpensesPage() {
               </button>
             </div>
             <label className="mt-5 block text-sm font-semibold">
-              Contraseña
+              Contraseña o PIN
               <input
                 autoFocus
                 required

@@ -142,7 +142,7 @@ def update_expense(
 
 
 @router.delete("/{expense_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_expense(expense_id: int, password: str, database: Session = Depends(get_db), current_user: User = Depends(require_admin)) -> None:
+def delete_expense(expense_id: int, password: str, database: Session = Depends(get_db), current_user: User = Depends(require_section("egresos"))) -> None:
     if not verify_password(password, current_user.password_hash):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="La contraseña no es válida")
     movement = database.scalar(select(FinancialMovement).where(FinancialMovement.id == expense_id, FinancialMovement.movement_type == "EXPENSE"))
