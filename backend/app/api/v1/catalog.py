@@ -4,7 +4,7 @@ from uuid import uuid4
 import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api.v1.dependencies import get_current_user, require_admin
@@ -187,7 +187,14 @@ def update_product(
         replace_components(product, validate_components(product.id, effective_is_combo, component_payload, database), database)
     elif not effective_is_combo:
         replace_components(product, [], database)
-    database.commit()
+    try:
+        database.commit()
+    except IntegrityError:
+        database.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No se pudo actualizar la composición del combo por una restricción de la base de datos") from None
+    except SQLAlchemyError:
+        database.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="La base de datos no pudo actualizar la composición del combo") from None
     database.refresh(product)
     return product
 
