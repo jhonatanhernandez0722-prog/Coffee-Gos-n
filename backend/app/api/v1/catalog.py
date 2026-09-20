@@ -72,6 +72,8 @@ def validate_components(
 
 def replace_components(product: Product, components: list[tuple[Product, object]], database: Session) -> None:
     product.combo_components.clear()
+    if product.id is not None:
+        database.flush()
     for component_product, quantity in components:
         product.combo_components.append(ComboComponent(component_product=component_product, quantity=quantity))
 router = APIRouter(tags=["catalog"])
