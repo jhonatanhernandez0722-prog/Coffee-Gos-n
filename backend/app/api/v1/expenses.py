@@ -11,7 +11,7 @@ from app.core.permissions import require_section
 from app.core.security import verify_password
 from app.core.config import settings
 from app.db.session import get_db
-from app.models import ExpenseCategory, FinancialMovement, User
+from app.models import ExpenseCategory, FinancialMovement, InventoryMovement, User
 from app.schemas.expenses import ExpenseCategoryCreate, ExpenseCategoryResponse, ExpenseCreate, ExpenseResponse, ExpensesResponse, SettleExpensesResponse
 
 router = APIRouter(prefix="/expenses", tags=["expenses"])
@@ -148,5 +148,12 @@ def delete_expense(expense_id: int, password: str, database: Session = Depends(g
     movement = database.scalar(select(FinancialMovement).where(FinancialMovement.id == expense_id, FinancialMovement.movement_type == "EXPENSE"))
     if movement is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Egreso no encontrado")
+    database.query(InventoryMovement).filter(InventoryMovement.financial_movement_id == movement.id).update(
+        {InventoryMovement.financial_movement_id: None}, synchronize_session=False,
+    )
     database.delete(movement)
-    database.commit()
+    try:
+        database.commit()
+    except IntegrityError:
+        database.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No se puede eliminar este egreso porque tiene otros movimientos relacionados") from None
