@@ -62,7 +62,7 @@ def balance_report(database: Session = Depends(get_db), _: User = Depends(requir
     inventory = database.scalar(select(func.coalesce(func.sum(Product.stock * Product.acquisition_cost), 0)).where(Product.is_active.is_(True))) or Decimal("0")
     liabilities = database.scalars(select(Liability).order_by(Liability.status, Liability.due_date, Liability.created_at)).all()
     total_liabilities = sum((liability.amount for liability in liabilities if liability.status == "PENDING"), Decimal("0"))
-    income = database.scalar(select(func.coalesce(func.sum(FinancialMovement.amount), 0)).where(FinancialMovement.movement_type == "INCOME", pending_credit_exists())) or Decimal("0")
+    income = database.scalar(select(func.coalesce(func.sum(FinancialMovement.amount), 0)).where(FinancialMovement.movement_type == "INCOME", FinancialMovement.income_type.is_distinct_from("OPENING_BALANCE"), pending_credit_exists())) or Decimal("0")
     costs = database.scalar(select(func.coalesce(func.sum(SaleItem.quantity * SaleItem.unit_cost_snapshot), 0)).join(Sale, Sale.id == SaleItem.sale_id).where(~select(Credit.id).where(Credit.sale_id == Sale.id, Credit.status == "PENDING").exists())) or Decimal("0")
     expenses = database.scalar(select(func.coalesce(func.sum(FinancialMovement.amount), 0)).where(FinancialMovement.movement_type == "EXPENSE", FinancialMovement.settled_at.is_not(None))) or Decimal("0")
     total_assets = cash + bank + receivables + inventory
