@@ -63,6 +63,7 @@ const normalizeDisplayNumber = (value: number | string | null | undefined, unit?
   if (unit === "UNIT" || unit === "PAQUETE" || Number.isInteger(parsed)) return String(Math.trunc(parsed));
   return parsed.toString().replace(/(\.\d*?[1-9])0+$/, "$1").replace(/\.0+$/, "");
 };
+const formatComboQuantity = (value: number | string | null | undefined) => normalizeDisplayNumber(value) || "0";
 
 const apiError = (result: { detail?: string | { msg?: string }[] }, fallback: string) =>
   Array.isArray(result.detail)
@@ -1050,7 +1051,7 @@ export default function ProductsPage() {
               </div>
             </div>
 
-            {product.is_combo && product.components?.length ? <div className="mt-4 border border-amber-200 bg-amber-50 p-3 text-xs"><strong className="text-amber-900">Compuesto por</strong><ul className="mt-2 space-y-1 text-amber-950">{product.components.map((component) => <li key={component.product_id}>{component.quantity} x {component.product_name ?? products.find((item) => item.id === component.product_id)?.name ?? "Producto"}</li>)}</ul></div> : null}
+            {product.is_combo && product.components?.length ? <div className="mt-4 border border-amber-200 bg-amber-50 p-3 text-xs"><strong className="text-amber-900">Compuesto por</strong><ul className="mt-2 space-y-1 text-amber-950">{product.components.map((component) => <li key={component.product_id}>{formatComboQuantity(component.quantity)} x {component.product_name ?? products.find((item) => item.id === component.product_id)?.name ?? "Producto"}</li>)}</ul></div> : null}
 
             <div className="mt-4 flex flex-wrap gap-2">
               <button

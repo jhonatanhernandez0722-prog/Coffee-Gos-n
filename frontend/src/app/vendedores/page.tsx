@@ -37,6 +37,7 @@ type PermissionKey =
   | "arqueo"
   | "balance"
   | "temas";
+const roleLabels: Record<Seller["role"], string> = { SELLER: "Vendedor", VIEWER: "Solo lectura" };
 const sections: { key: PermissionKey; label: string }[] = [
   { key: "dashboard", label: "Resumen" },
   { key: "comanda", label: "Ventas" },
@@ -76,7 +77,7 @@ export default function SellersPage() {
     });
     const result = await response.json();
     if (!response.ok)
-      throw new Error(result.detail ?? "No fue posible cargar los vendedores.");
+      throw new Error(result.detail ?? "No fue posible cargar los usuarios.");
     setSellers(result as Seller[]);
   }
 
@@ -126,7 +127,7 @@ export default function SellersPage() {
     event.preventDefault();
     setError("");
     if (!editing && !pin) {
-      setError("El PIN es obligatorio para crear el vendedor.");
+      setError("El PIN es obligatorio para crear el usuario.");
       return;
     }
     if (permissions.length === 0) {
@@ -158,7 +159,7 @@ export default function SellersPage() {
         throw new Error(
           Array.isArray(result.detail)
             ? result.detail.map((item: { msg?: string }) => item.msg).join(". ")
-            : (result.detail ?? "No fue posible guardar el vendedor."),
+            : (result.detail ?? "No fue posible guardar el usuario."),
         );
       await loadSellers();
       resetForm();
@@ -166,7 +167,7 @@ export default function SellersPage() {
       setError(
         requestError instanceof Error
           ? requestError.message
-          : "No fue posible guardar el vendedor.",
+          : "No fue posible guardar el usuario.",
       );
     } finally {
       setSaving(false);
@@ -186,7 +187,7 @@ export default function SellersPage() {
     });
     if (!response.ok) {
       const result = await response.json();
-      setError(result.detail ?? "No fue posible actualizar el vendedor.");
+      setError(result.detail ?? "No fue posible actualizar el usuario.");
       return;
     }
     await loadSellers();
@@ -194,7 +195,7 @@ export default function SellersPage() {
 
   return (
     <AdminPage
-      title="Vendedores"
+      title="Usuarios"
       description="Crea accesos con PIN y decide qué apartados puede consultar cada persona del equipo."
     >
       {error && (
@@ -215,7 +216,7 @@ export default function SellersPage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <section className="border border-[var(--line)] bg-white">
           <div className="border-b border-[var(--line)] p-5">
-            <h2 className="font-semibold">Vendedores registrados</h2>
+            <h2 className="font-semibold">Usuarios registrados</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">
               El PIN funciona como contraseña de acceso.
             </p>
@@ -237,7 +238,7 @@ export default function SellersPage() {
                       {seller.email}
                     </p>
                     <p className="mt-2 text-xs text-[var(--muted)]">
-                      {seller.permissions
+                      {roleLabels[seller.role]} · {seller.permissions
                         .map(
                           (permission) =>
                             sections.find(
@@ -257,7 +258,7 @@ export default function SellersPage() {
                   </span>
                   {isAdmin && <>
                     <button
-                      title="Editar vendedor"
+                      title="Editar usuario"
                       onClick={() => editSeller(seller)}
                       className="grid size-9 place-items-center border border-[var(--line)] text-[var(--blue-main)]"
                     >
@@ -275,7 +276,7 @@ export default function SellersPage() {
             ))}
             {sellers.length === 0 && (
               <p className="p-8 text-sm text-[var(--muted)]">
-                Aún no hay vendedores registrados.
+                Aún no hay usuarios registrados.
               </p>
             )}
           </div>
@@ -290,7 +291,7 @@ export default function SellersPage() {
                 {editing ? "Editar acceso" : "Nuevo acceso"}
               </p>
               <h2 className="mt-1 font-semibold">
-                {editing ? editing.full_name : "Agregar vendedor"}
+                {editing ? editing.full_name : "Agregar usuario"}
               </h2>
             </div>
             {editing ? (
@@ -390,7 +391,7 @@ export default function SellersPage() {
               ? "Guardando..."
               : editing
                 ? "Guardar cambios"
-                : "Crear vendedor"}
+                : `Crear ${roleLabels[role].toLowerCase()}`}
           </button>
         </form>}
       </div>

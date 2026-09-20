@@ -61,8 +61,8 @@ def create_seller(payload: SellerCreate, database: Session = Depends(get_db), _:
 @router.patch("/{user_id}", response_model=SellerResponse)
 def update_seller(user_id: int, payload: SellerUpdate, database: Session = Depends(get_db), _: User = Depends(require_admin)) -> SellerResponse:
     seller = database.get(User, user_id)
-    if seller is None or seller.role != "SELLER":
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vendedor no encontrado")
+    if seller is None or seller.role not in {"SELLER", "VIEWER"}:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
     values = payload.model_dump(exclude_unset=True)
     permissions = values.pop("permissions", None)
     pin = values.pop("pin", None)
