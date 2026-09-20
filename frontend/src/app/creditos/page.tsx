@@ -25,7 +25,8 @@ const money = (value: number) =>
   new Intl.NumberFormat("es-CO", {
     style: "currency",
     currency: "COP",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
   }).format(value);
 const mediaUrl = (path: string) =>
   /^https?:\/\//i.test(path) ? path : `${apiUrl.replace("/api/v1", "")}${path}`;
