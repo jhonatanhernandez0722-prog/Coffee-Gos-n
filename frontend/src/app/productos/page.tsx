@@ -72,6 +72,7 @@ const apiError = (result: { detail?: string | { msg?: string }[] }, fallback: st
 const unitLabels: Record<Product["unit"], string> = { KG: "kg", ML: "ml", UNIT: "unidad", PAQUETE: "paquete" };
 const contentUnitLabels: Record<"G" | "KG" | "ML" | "L" | "UNIT", string> = { G: "g", KG: "kg", ML: "ml", L: "l", UNIT: "unidad" };
 const normalizeQuantityInput = (value: string, unit: Product["unit"]) => unit === "UNIT" || unit === "PAQUETE" ? value.replace(/[^0-9]/g, "") : value;
+const normalizeIntegerInput = (value: string) => value.replace(/[^0-9]/g, "");
 const preventDecimalKeys = (event: KeyboardEvent<HTMLInputElement>) => {
   if ([".", ",", "e", "E", "+", "-"].includes(event.key)) event.preventDefault();
 };
@@ -831,7 +832,7 @@ export default function ProductsPage() {
                       {comboComponents.map((component, index) => (
                         <div key={`${index}-${component.product_id}`} className="grid gap-3 border border-[var(--line)] bg-white p-3 sm:grid-cols-[minmax(0,1fr)_140px_auto] sm:items-end">
                           <label className="text-xs font-semibold">Producto {index + 1}<select value={component.product_id || ""} onChange={(event) => setComboComponents((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, product_id: Number(event.target.value) } : item))} className="mt-1 min-h-10 w-full border border-[var(--line)] bg-white px-3 text-sm font-normal"><option value="">Selecciona un producto</option>{products.filter((product) => product.is_active && product.is_saleable && product.id !== editing?.id).map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
-                          <label className="text-xs font-semibold">Cantidad<input min="0.001" step="0.001" type="number" value={component.quantity} onChange={(event) => setComboComponents((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, quantity: Number(event.target.value) } : item))} className="mt-1 min-h-10 w-full border border-[var(--line)] px-3 text-sm font-normal" /></label>
+                          <label className="text-xs font-semibold">Cantidad<input min="1" step="1" inputMode="numeric" type="number" value={component.quantity} onKeyDown={preventDecimalKeys} onChange={(event) => setComboComponents((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, quantity: Number(normalizeIntegerInput(event.target.value) || "0") } : item))} className="mt-1 min-h-10 w-full border border-[var(--line)] px-3 text-sm font-normal" /></label>
                           <button type="button" aria-label={`Eliminar producto ${index + 1}`} onClick={() => setComboComponents((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="inline-flex min-h-10 items-center justify-center border border-red-200 px-3 text-xs font-semibold text-red-700"><X size={15} /> Quitar</button>
                         </div>
                       ))}
