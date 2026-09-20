@@ -27,6 +27,8 @@ const money = (value: number) =>
     currency: "COP",
     maximumFractionDigits: 0,
   }).format(value);
+const quantity = (value: number) =>
+  new Intl.NumberFormat("es-CO", { maximumFractionDigits: 3 }).format(value);
 const mediaUrl = (path: string) =>
   /^https?:\/\//i.test(path) ? path : `${apiUrl.replace("/api/v1", "")}${path}`;
 
@@ -224,7 +226,7 @@ export default function CreditsPage() {
                           credit.products.map((product) => (
                             <li key={`${credit.id}-${product.name}`}>
                               <span className="font-semibold">
-                                {product.quantity} x
+                                {quantity(Number(product.quantity))} x
                               </span>{" "}
                               {product.name}
                             </li>
