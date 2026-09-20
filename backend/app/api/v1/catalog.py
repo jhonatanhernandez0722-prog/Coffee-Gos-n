@@ -159,7 +159,7 @@ def update_product(
     product = database.get(Product, product_id)
     if product is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    values = payload.model_dump(exclude_unset=True)
+    values = payload.model_dump(exclude_unset=True, exclude={"components"})
     if "category_id" in values:
         category = database.get(Category, values["category_id"])
         if category is None or not category.is_active:
@@ -168,10 +168,7 @@ def update_product(
     effective_is_combo = values.get("is_combo", product.is_combo)
     if effective_is_combo and effective_unit != "UNIT":
         raise HTTPException(status_code=400, detail="Los combos deben medirse en unidades")
-    if "components" in values:
-        component_payload = values.pop("components") or []
-    else:
-        component_payload = None
+    component_payload = payload.components or [] if "components" in payload.model_fields_set else None
     if "is_combo" in values:
         values.pop("is_combo")
     if component_payload is not None or "is_combo" in payload.model_fields_set:
