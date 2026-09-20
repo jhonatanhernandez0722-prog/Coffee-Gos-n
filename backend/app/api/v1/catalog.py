@@ -154,7 +154,7 @@ def update_product(
     product_id: int,
     payload: ProductUpdate,
     database: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_section("productos")),
 ) -> Product:
     product = database.get(Product, product_id)
     if product is None:
