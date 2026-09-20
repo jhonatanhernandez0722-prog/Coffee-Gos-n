@@ -157,6 +157,8 @@ class Sale(Base):
     payment_method: Mapped[str] = mapped_column(String(20))
     subtotal: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     total: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    amount_received: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
+    change_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
     items: Mapped[List["SaleItem"]] = relationship(back_populates="sale")
 

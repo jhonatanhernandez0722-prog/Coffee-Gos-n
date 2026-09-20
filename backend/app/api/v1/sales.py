@@ -114,6 +114,15 @@ def create_sale(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El vendedor seleccionado no está disponible")
 
         subtotal = sum((locked_products[item.product_id].sale_price * item.quantity for item in payload.items), Decimal("0"))
+        amount_received = payload.amount_received.quantize(Decimal("0.01")) if payload.amount_received is not None else None
+        if payload.payment_method == "CASH":
+            if amount_received is None:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Indica cuánto dinero recibió el cajero")
+            if amount_received < subtotal:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El dinero recibido no puede ser menor que el total")
+        else:
+            amount_received = None
+        change_amount = (amount_received - subtotal) if amount_received is not None else Decimal("0")
         sale = Sale(
             sale_number=f"V-{datetime.now(timezone.utc):%Y%m%d%H%M%S}-{uuid4().hex[:6].upper()}",
             customer_id=customer.id if customer else None,
@@ -122,6 +131,8 @@ def create_sale(
             payment_method=payload.payment_method,
             subtotal=subtotal,
             total=subtotal,
+            amount_received=amount_received,
+            change_amount=change_amount,
         )
         database.add(sale)
         database.flush()
@@ -144,6 +155,8 @@ def create_sale(
             sale_number=sale.sale_number,
             total=sale.total,
             payment_method=sale.payment_method,
+            amount_received=sale.amount_received,
+            change_amount=sale.change_amount,
             credit_created=credit_created,
             customer_name=customer.name if customer else None,
             created_at=sale.created_at.isoformat() if sale.created_at else datetime.now(timezone.utc).isoformat(),

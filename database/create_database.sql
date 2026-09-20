@@ -64,6 +64,8 @@ CREATE TABLE IF NOT EXISTS sales (
                     CHECK (payment_method IN ('CASH', 'NEQUI', 'CREDIT')),
     subtotal        NUMERIC(12, 2) NOT NULL CHECK (subtotal >= 0),
     total           NUMERIC(12, 2) NOT NULL CHECK (total >= 0),
+    amount_received NUMERIC(12, 2),
+    change_amount   NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (change_amount >= 0),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
