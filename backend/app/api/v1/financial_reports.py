@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 from app.api.v1.dependencies import require_admin
 from app.core.permissions import require_section
 from app.db.session import get_db
-from app.models import Credit, FinancialMovement, Liability, Product, Sale, SaleItem, User
-from app.schemas.financial_reports import BalanceReport, CashReconciliation, LiabilityCreate, LiabilityResponse
+from app.models import Credit, FinancialMovement, Liability, OpeningBalanceCorrection, Product, Sale, SaleItem, User
+from app.schemas.financial_reports import BalanceReport, CashReconciliation, LiabilityCreate, LiabilityResponse, OpeningBalanceCorrectionCreate, OpeningBalanceCorrectionResponse, OpeningBalanceResponse
 
 router = APIRouter(prefix="/financial-reports", tags=["financial-reports"])
 
@@ -52,6 +52,50 @@ def cash_reconciliation(report_date: date | None = None, database: Session = Dep
     bank = cash_balance(database, "NEQUI", as_of)
     receivables = pending_receivables(database, as_of)
     return CashReconciliation(date=selected_date, cash=cash, bank=bank, receivables=receivables, total=cash + bank + receivables)
+
+
+@router.get("/opening-balance", response_model=OpeningBalanceResponse)
+def opening_balance(database: Session = Depends(get_db), _: User = Depends(require_admin)) -> OpeningBalanceResponse:
+    values = database.execute(
+        select(FinancialMovement.payment_method, FinancialMovement.amount)
+        .where(FinancialMovement.movement_type == "INCOME", FinancialMovement.income_type == "OPENING_BALANCE")
+    ).all()
+    balances = {method: amount for method, amount in values}
+    return OpeningBalanceResponse(cash=balances.get("CASH", Decimal("0")), nequi=balances.get("NEQUI", Decimal("0")))
+
+
+@router.post("/opening-balance/correction", response_model=OpeningBalanceCorrectionResponse)
+def correct_opening_balance(
+    payload: OpeningBalanceCorrectionCreate,
+    database: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> OpeningBalanceCorrectionResponse:
+    movements = database.scalars(
+        select(FinancialMovement)
+        .where(FinancialMovement.movement_type == "INCOME", FinancialMovement.income_type == "OPENING_BALANCE")
+        .with_for_update()
+    ).all()
+    by_method = {movement.payment_method: movement for movement in movements}
+    missing_methods = {"CASH", "NEQUI"} - set(by_method)
+    if missing_methods:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No se encontraron los saldos iniciales de efectivo y Nequi")
+
+    cash_before = by_method["CASH"].amount
+    nequi_before = by_method["NEQUI"].amount
+    by_method["CASH"].amount = payload.cash
+    by_method["NEQUI"].amount = payload.nequi
+    correction = OpeningBalanceCorrection(
+        user_id=current_user.id,
+        cash_before=cash_before,
+        cash_after=payload.cash,
+        nequi_before=nequi_before,
+        nequi_after=payload.nequi,
+        reason=payload.reason.strip(),
+    )
+    database.add(correction)
+    database.commit()
+    database.refresh(correction)
+    return OpeningBalanceCorrectionResponse(cash=correction.cash_after, nequi=correction.nequi_after, reason=correction.reason, corrected_at=correction.created_at)
 
 
 @router.get("/balance", response_model=BalanceReport)

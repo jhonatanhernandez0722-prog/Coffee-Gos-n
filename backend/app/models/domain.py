@@ -222,6 +222,19 @@ class FinancialMovement(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
 
+class OpeningBalanceCorrection(Base):
+    __tablename__ = "opening_balance_corrections"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    cash_before: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    cash_after: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    nequi_before: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    nequi_after: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    reason: Mapped[str] = mapped_column(Text())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
 class ExpenseCategory(Base):
     __tablename__ = "expense_categories"
 

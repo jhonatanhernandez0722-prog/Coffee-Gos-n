@@ -12,6 +12,22 @@ class CashReconciliation(BaseModel):
     total: Decimal
 
 
+class OpeningBalanceResponse(BaseModel):
+    cash: Decimal
+    nequi: Decimal
+
+
+class OpeningBalanceCorrectionCreate(BaseModel):
+    cash: Decimal = Field(ge=0, decimal_places=2)
+    nequi: Decimal = Field(ge=0, decimal_places=2)
+    reason: str = Field(min_length=5, max_length=500)
+
+
+class OpeningBalanceCorrectionResponse(OpeningBalanceResponse):
+    reason: str
+    corrected_at: datetime
+
+
 class LiabilityCreate(BaseModel):
     kind: str = Field(pattern="^(SUPPLIER|SERVICE|CHURCH_CONTRIBUTION)$")
     description: str = Field(min_length=2, max_length=240)
