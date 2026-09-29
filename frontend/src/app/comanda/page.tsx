@@ -3,7 +3,15 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import {
+  Banknote,
+  Check,
+  CreditCard,
   Download,
+  ImagePlus,
+  Layers,
+  ReceiptText,
+  Smartphone,
+  UserRound,
   Minus,
   Plus,
   Printer,
@@ -351,14 +359,36 @@ export default function ComandaPage() {
     0,
   );
 
+  const cartUnits = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const received = Number(amountReceived);
+  const paymentOptions: { value: PaymentMethod; label: string; icon: typeof Banknote }[] = [
+    { value: "CASH", label: "Efectivo", icon: Banknote },
+    { value: "NEQUI", label: "Nequi", icon: Smartphone },
+    { value: "CREDIT", label: "Crédito", icon: CreditCard },
+  ];
+
   return (
     <AdminPage
       title="Ventas"
       description="Registra ventas, selecciona el comprador y el método de pago."
     >
       <section className="mb-6 border border-[var(--line)] bg-white p-5">
-        <label className="text-sm font-semibold">
-          Vendedor asignado <span className="text-red-700">*</span>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 text-sm font-semibold">
+            <UserRound size={16} className="text-[var(--blue-main)]" />
+            Vendedor asignado <span className="text-red-700">*</span>
+          </h2>
+          {assignedSellerId ? (
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+              <Check size={14} /> Listo para vender
+            </span>
+          ) : (
+            <span className="text-xs text-[var(--muted)]">
+              Elige quién atiende esta venta
+            </span>
+          )}
+        </div>
+        {sellers.length === 0 ? (
           <select
             required
             value={assignedSellerId ?? ""}
@@ -367,39 +397,34 @@ export default function ComandaPage() {
                 event.target.value ? Number(event.target.value) : null,
               )
             }
-            className="mt-2 min-h-11 w-full border border-[var(--line)] bg-white px-3 font-normal"
+            className="mt-3 min-h-11 w-full border border-[var(--line)] bg-white px-3 text-sm"
+            aria-label="Vendedor asignado"
           >
             <option value="">Selecciona un vendedor</option>
-            {sellers.map((seller) => (
-              <option key={seller.id} value={seller.id}>
-                {seller.full_name}
-              </option>
-            ))}
           </select>
-        </label>
+        ) : (
+          <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto pb-1">
+            {sellers.map((seller) => (
+              <button
+                key={seller.id}
+                type="button"
+                aria-pressed={assignedSellerId === seller.id}
+                onClick={() =>
+                  setAssignedSellerId(
+                    assignedSellerId === seller.id ? null : seller.id,
+                  )
+                }
+                className="choice shrink-0 !justify-start !pl-1.5"
+              >
+                <span className="grid size-8 place-items-center rounded-lg bg-[var(--canvas)] font-heading text-sm font-bold text-[var(--blue-main)]">
+                  {seller.full_name.charAt(0).toUpperCase()}
+                </span>
+                {seller.full_name}
+              </button>
+            ))}
+          </div>
+        )}
       </section>
-      {paymentMethod === "NEQUI" && (
-        <section className="mb-6 border border-emerald-200 bg-emerald-50 p-5">
-          <label className="block text-sm font-semibold text-emerald-950">
-            Soporte de pago{" "}
-            <span className="font-normal text-emerald-800">(opcional)</span>
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              multiple
-              onChange={(event) =>
-                setSupportFiles(
-                  Array.from(event.target.files ?? []).slice(0, 5),
-                )
-              }
-              className="mt-2 block min-h-11 w-full border border-emerald-200 bg-white px-3 py-2 text-sm font-normal"
-            />
-            <span className="mt-1 block text-xs font-normal text-emerald-800">
-              Puedes adjuntar hasta 5 imágenes antes de confirmar la venta.
-            </span>
-          </label>
-        </section>
-      )}
       {error && (
         <p
           role="alert"
@@ -408,70 +433,96 @@ export default function ComandaPage() {
           {error}
         </p>
       )}
-      <div className="grid items-start gap-4 md:grid-cols-[minmax(0,1fr)_minmax(280px,380px)] lg:gap-6">
-        <section className="min-w-0 border border-[var(--line)] bg-white p-5">
-          <label className="relative block">
-            <span className="sr-only">Buscar productos</span>
-            <Search
-              size={18}
-              className="absolute left-3 top-3.5 text-[var(--muted)]"
-            />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar producto para agregar"
-              className="min-h-12 w-full border border-[var(--line)] pl-10 pr-4 outline-none focus:border-[var(--blue-main)]"
-            />
-          </label>
-          <div className="mt-5 grid items-start gap-4 sm:grid-cols-2">
+      <div className="grid items-start gap-4 md:grid-cols-[minmax(0,1fr)_minmax(300px,390px)] lg:gap-6">
+        <section className="min-w-0 border border-[var(--line)] bg-white p-4 sm:p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <label className="relative block flex-1">
+              <span className="sr-only">Buscar productos</span>
+              <Search
+                size={18}
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)]"
+              />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Buscar producto para agregar"
+                className="min-h-12 w-full border border-[var(--line)] pl-11 pr-10"
+              />
+              {search && (
+                <button
+                  type="button"
+                  aria-label="Limpiar búsqueda"
+                  onClick={() => setSearch("")}
+                  className="absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center text-[var(--muted)] hover:text-[var(--ink)]"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </label>
+            <span className="shrink-0 text-sm text-[var(--muted)]">
+              {visibleProducts.length} disponibles
+            </span>
+          </div>
+          <div className="mt-5 grid items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {visibleProducts.map((product) => {
               const productImage = imageUrl(product.image_url);
+              const inCart = cart.find((line) => line.id === product.id);
               return (
                 <button
                   key={product.id}
                   onClick={() => addProduct(product)}
-                  className="flex min-h-64 flex-col overflow-hidden border-[3px] border-black bg-white text-left hover:bg-white focus:bg-white"
+                  aria-label={`Agregar ${product.name}`}
+                  className={`product-tile ${inCart ? "in-cart" : ""}`}
                 >
-                  <span className="relative block aspect-[4/3] w-full bg-white">
+                  <span className="relative block aspect-[4/3] w-full bg-[linear-gradient(160deg,var(--canvas),var(--surface))]">
                     {productImage ? (
                       <Image
                         src={productImage}
                         alt={product.name}
                         fill
                         unoptimized
-                        className="object-contain"
+                        className="object-contain p-3"
                       />
                     ) : (
                       <ShoppingBag
-                        className="absolute inset-0 m-auto text-[var(--blue-main)]"
+                        className="absolute inset-0 m-auto text-[var(--blue-main)] opacity-60"
                         size={42}
                       />
                     )}
-                  </span>
-                  <span className="flex flex-1 items-end justify-between gap-3 bg-white p-4">
-                    <span>
-                      <strong className="block">{product.name}</strong>
-                      {product.is_combo && (
-                        <span className="mt-1 inline-flex border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-800">
-                          COMBO
+                    <span className="add-badge" aria-hidden="true">
+                      {inCart ? (
+                        <span key={inCart.quantity} className="pop text-sm font-bold">
+                          {inCart.quantity}
                         </span>
+                      ) : (
+                        <Plus size={18} />
                       )}
-                      <span className="mt-1 block text-sm text-[var(--muted)]">
+                    </span>
+                    {product.is_combo && (
+                      <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-800 shadow-sm">
+                        <Layers size={12} /> Combo
+                      </span>
+                    )}
+                  </span>
+                  <span className="flex flex-1 flex-col gap-2 border-t border-[var(--line)] p-4">
+                    <strong className="block leading-snug">{product.name}</strong>
+                    {product.is_combo && product.components?.length ? (
+                      <span className="block text-xs text-[var(--muted)]">
+                        {product.components
+                          .map(
+                            (component) =>
+                              `${formatComboQuantity(component.quantity)} x ${component.product_name ?? "producto"}`,
+                          )
+                          .join(", ")}
+                      </span>
+                    ) : null}
+                    <span className="mt-auto flex items-end justify-between gap-3 pt-1">
+                      <span className="text-xs text-[var(--muted)]">
                         Stock: {formatStock(product)}
                       </span>
-                      {product.is_combo && product.components?.length ? (
-                        <span className="mt-1 block text-xs text-[var(--muted)]">
-                          {product.components
-                            .map(
-                              (component) =>
-                                `${formatComboQuantity(component.quantity)} x ${component.product_name ?? "producto"}`,
-                            )
-                            .join(", ")}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="shrink-0 font-semibold text-[var(--blue-main)]">
-                      {money(product.sale_price)}
+                      <span className="shrink-0 font-heading text-lg font-bold tracking-tight text-[var(--blue-main)]">
+                        {money(product.sale_price)}
+                      </span>
                     </span>
                   </span>
                 </button>
@@ -479,19 +530,41 @@ export default function ComandaPage() {
             })}
           </div>
           {products.length === 0 && (
-            <div className="p-10 text-center text-sm text-[var(--muted)]">
-              <ShoppingBag
-                className="mx-auto mb-3 text-[var(--blue-main)]"
-                size={26}
-              />
-              El catálogo está vacío.
+            <div className="grid place-items-center gap-3 p-12 text-center">
+              <span className="grid size-14 place-items-center rounded-2xl bg-[var(--blue-light)] text-[var(--blue-main)]">
+                <ShoppingBag size={26} />
+              </span>
+              <p className="font-semibold">El catálogo está vacío.</p>
+              <p className="max-w-xs text-sm text-[var(--muted)]">
+                Agrega productos con stock en la sección Productos para venderlos aquí.
+              </p>
             </div>
           )}
+          {products.length > 0 && visibleProducts.length === 0 && (
+            <p className="p-10 text-center text-sm text-[var(--muted)]">
+              Ningún producto disponible coincide con “{search}”.
+            </p>
+          )}
         </section>
-        <aside className="border border-[var(--ink)] bg-white p-5">
-          <div className="border-b border-[var(--line)] pb-4">
-            <h2 className="font-semibold">Datos de la venta</h2>
-            <div className="relative mt-4">
+        <aside className="border border-[var(--line)] bg-white md:sticky md:top-32">
+          <div className="screen m-3 p-5">
+            <div className="screen-label flex items-center justify-between text-xs font-semibold">
+              <span className="flex items-center gap-1.5">
+                <ReceiptText size={14} /> Venta actual
+              </span>
+              <span>
+                {cart.length} líneas · {formatComboQuantity(cartUnits)} und.
+              </span>
+            </div>
+            <p className="screen-amount mt-4 text-5xl">{money(total)}</p>
+            {paymentMethod === "CASH" && received >= total && total > 0 && (
+              <p className="pop mt-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-400/15 px-3 py-1 text-sm font-semibold text-emerald-200">
+                Vuelto {money(received - total)}
+              </p>
+            )}
+          </div>
+          <div className="px-5 pb-5 pt-2">
+            <div className="relative">
               <label className="text-sm font-semibold">
                 Comprador
                 <input
@@ -501,40 +574,49 @@ export default function ComandaPage() {
                     setCustomerId(null);
                   }}
                   placeholder="Escribe para buscar o crear"
-                  className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal outline-none focus:border-[var(--blue-main)]"
+                  className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal"
                 />
               </label>
+              {customerId && (
+                <span className="absolute right-3 top-[2.35rem] inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
+                  <Check size={13} /> Cliente
+                </span>
+              )}
               {suggestions.length > 0 && (
-                <div className="absolute z-10 mt-1 w-full border border-[var(--line)] bg-white shadow-lg">
+                <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-xl border border-[var(--line)] bg-white shadow-xl">
                   {suggestions.map((customer) => (
                     <button
                       key={customer.id}
                       type="button"
                       onClick={() => chooseCustomer(customer)}
-                      className="block min-h-11 w-full px-3 text-left text-sm hover:bg-[var(--blue-light)]"
+                      className="flex min-h-11 w-full items-center gap-2 !rounded-none px-3 text-left text-sm hover:bg-[var(--blue-light)]"
                     >
+                      <UserRound size={14} className="text-[var(--muted)]" />
                       {customer.name}
                     </button>
                   ))}
                 </div>
               )}
             </div>
-            <label className="mt-3 block text-sm font-semibold">
-              Método de pago
-              <select
-                value={paymentMethod}
-                onChange={(event) =>
-                  setPaymentMethod(event.target.value as PaymentMethod)
-                }
-                className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal outline-none focus:border-[var(--blue-main)]"
-              >
-                <option value="CASH">Efectivo</option>
-                <option value="NEQUI">Nequi</option>
-                <option value="CREDIT">Crédito</option>
-              </select>
-            </label>
+            <fieldset className="mt-4">
+              <legend className="text-sm font-semibold">Método de pago</legend>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                {paymentOptions.map(({ value, label, icon: Icon }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={paymentMethod === value}
+                    onClick={() => setPaymentMethod(value)}
+                    className="choice !flex-col !gap-1 !px-1 py-2"
+                  >
+                    <Icon size={17} />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
             {paymentMethod === "CASH" && (
-              <label className="mt-3 block text-sm font-semibold">
+              <label className="mt-4 block text-sm font-semibold">
                 Dinero recibido
                 <input
                   required
@@ -556,165 +638,195 @@ export default function ComandaPage() {
                 </span>
               </label>
             )}
+            {paymentMethod === "NEQUI" && (
+              <label className="mt-4 block rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-950">
+                <span className="flex items-center gap-2">
+                  <ImagePlus size={16} /> Soporte de pago{" "}
+                  <span className="font-normal text-emerald-800">(opcional)</span>
+                </span>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  multiple
+                  onChange={(event) =>
+                    setSupportFiles(
+                      Array.from(event.target.files ?? []).slice(0, 5),
+                    )
+                  }
+                  className="mt-2 block min-h-11 w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-normal"
+                />
+                <span className="mt-1 block text-xs font-normal text-emerald-800">
+                  {supportFiles.length > 0
+                    ? `${supportFiles.length} imagen(es) lista(s) para adjuntar.`
+                    : "Puedes adjuntar hasta 5 imágenes antes de confirmar la venta."}
+                </span>
+              </label>
+            )}
             {paymentMethod === "CREDIT" && (
-              <p className="mt-2 text-xs text-[var(--muted)]">
+              <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
                 El crédito se crea automáticamente con esta venta.
               </p>
             )}
-          </div>
-          <div className="flex items-center justify-between border-b border-[var(--line)] py-4">
-            <h2 className="font-semibold">Venta actual</h2>
-            <span className="text-sm text-[var(--muted)]">
-              {cart.length} líneas
-            </span>
-          </div>
-          <div className="min-h-48 py-4">
-            {cart.length === 0 ? (
-              <p className="py-12 text-center text-sm text-[var(--muted)]">
-                Selecciona productos para comenzar.
-              </p>
-            ) : (
-              cart.map((item) => (
-                <div
-                  key={item.id}
-                  className="border-b border-[var(--line)] py-3"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="font-semibold">{item.name}</p>
-                    <button
-                      aria-label={`Eliminar ${item.name}`}
-                      onClick={() =>
-                        setCart((current) =>
-                          current.filter((line) => line.id !== item.id),
-                        )
-                      }
-                      className="text-[var(--muted)] hover:text-red-600"
+
+            <div className="mt-5 border-t border-[var(--line)] pt-2">
+              {cart.length === 0 ? (
+                <div className="grid place-items-center gap-2 py-10 text-center">
+                  <ShoppingBag size={24} className="text-[var(--blue-main)] opacity-60" />
+                  <p className="text-sm text-[var(--muted)]">
+                    Selecciona productos para comenzar.
+                  </p>
+                </div>
+              ) : (
+                <div className="max-h-[40vh] overflow-y-auto pr-1">
+                  {cart.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center gap-3 border-b border-dashed border-[var(--line)] py-3 last:border-0"
                     >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <button
-                        aria-label="Reducir cantidad"
-                        onClick={() => changeQuantity(item.id, -1)}
-                        className="grid size-8 place-items-center border border-[var(--line)]"
-                      >
-                        <Minus size={14} />
-                      </button>
-                      <span className="w-5 text-center text-sm">
-                        {item.quantity}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">{item.name}</p>
+                        <p className="text-xs text-[var(--muted)]">
+                          {money(item.sale_price)} c/u
+                        </p>
+                      </div>
+                      <div className="flex items-center rounded-full border border-[var(--line)] bg-[var(--canvas)] p-0.5">
+                        <button
+                          aria-label="Reducir cantidad"
+                          onClick={() => changeQuantity(item.id, -1)}
+                          className="grid size-7 place-items-center !rounded-full hover:bg-white"
+                        >
+                          <Minus size={13} />
+                        </button>
+                        <span className="w-6 text-center text-sm font-semibold tabular">
+                          {item.quantity}
+                        </span>
+                        <button
+                          aria-label="Aumentar cantidad"
+                          onClick={() => changeQuantity(item.id, 1)}
+                          className="grid size-7 place-items-center !rounded-full hover:bg-white"
+                        >
+                          <Plus size={13} />
+                        </button>
+                      </div>
+                      <span className="w-20 text-right text-sm font-bold tabular">
+                        {money(item.sale_price * item.quantity)}
                       </span>
                       <button
-                        aria-label="Aumentar cantidad"
-                        onClick={() => changeQuantity(item.id, 1)}
-                        className="grid size-8 place-items-center border border-[var(--line)]"
+                        aria-label={`Eliminar ${item.name}`}
+                        onClick={() =>
+                          setCart((current) =>
+                            current.filter((line) => line.id !== item.id),
+                          )
+                        }
+                        className="grid size-7 place-items-center text-[var(--muted)] hover:text-red-600"
                       >
-                        <Plus size={14} />
+                        <Trash2 size={15} />
                       </button>
                     </div>
-                    <span className="font-semibold">
-                      {money(item.sale_price * item.quantity)}
-                    </span>
-                  </div>
+                  ))}
                 </div>
-              ))
-            )}
-          </div>
-          <div className="border-t border-[var(--line)] pt-4">
-            <div className="flex items-center justify-between text-lg font-semibold">
-              <span>Total</span>
-              <span>{money(total)}</span>
+              )}
             </div>
-            <button
-              onClick={confirmSale}
-              disabled={cart.length === 0 || saving}
-              className="mt-5 min-h-12 w-full bg-[var(--blue-main)] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {saving ? "Registrando..." : "Confirmar venta"}
-            </button>
+            <div className="border-t border-[var(--line)] pt-4">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold">Total</span>
+                <span className="font-heading text-2xl font-bold tracking-tight">{money(total)}</span>
+              </div>
+              <button
+                onClick={confirmSale}
+                disabled={cart.length === 0 || saving}
+                className="mt-4 flex min-h-13 w-full items-center justify-center gap-2 bg-[var(--blue-main)] text-base font-bold text-white hover:bg-[var(--blue-secondary)] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Check size={19} />
+                {saving ? "Registrando..." : "Confirmar venta"}
+              </button>
+            </div>
           </div>
         </aside>
       </div>
       {receipt && (
-        <div className="fixed inset-0 z-20 grid place-items-center bg-[var(--ink)]/50 p-4">
-          <article className="w-full max-w-md bg-white p-7 shadow-2xl">
-            <div className="flex justify-end print:hidden">
-              <button
-                aria-label="Cerrar factura"
-                onClick={() => setReceipt(null)}
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="text-center">
-              <div className="mx-auto grid size-12 place-items-center bg-[var(--blue-main)] text-white">
-                <ShoppingBag size={22} />
-              </div>
-              <h2 className="mt-4 text-2xl font-semibold">Coffee Gosen</h2>
-              <p className="mt-1 text-xs text-[var(--muted)]">
-                Comprobante de venta
-              </p>
-            </div>
-            <div className="mt-6 border-y border-dashed border-[var(--line)] py-4 text-sm">
-              <div className="flex justify-between">
-                <span>Venta</span>
-                <strong>{receipt.sale_number}</strong>
-              </div>
-              <div className="mt-2 flex justify-between">
-                <span>Comprador</span>
-                <span>{receipt.customer_name ?? "Venta general"}</span>
-              </div>
-              <div className="mt-2 flex justify-between">
-                <span>Pago</span>
-                <span>{paymentLabel[receipt.payment_method]}</span>
-              </div>
-              {receipt.payment_method === "CASH" &&
-                receipt.amount_received !== null && (
-                  <>
-                    <div className="mt-2 flex justify-between">
-                      <span>Recibido</span>
-                      <span>{money(receipt.amount_received)}</span>
-                    </div>
-                    <div className="mt-2 flex justify-between">
-                      <span>Vuelto</span>
-                      <span>{money(receipt.change_amount)}</span>
-                    </div>
-                  </>
-                )}
-            </div>
-            <div className="py-4">
-              {receipt.items.map((item) => (
-                <div
-                  key={item.name}
-                  className="flex justify-between py-2 text-sm"
+        <div className="fixed inset-0 z-40 grid place-items-center overflow-y-auto bg-[var(--ink)]/60 p-4">
+          <article className="pop w-full max-w-md">
+            <div className="rounded-t-[22px] bg-white p-7 shadow-2xl !rounded-b-none">
+              <div className="flex justify-end print:hidden">
+                <button
+                  aria-label="Cerrar factura"
+                  onClick={() => setReceipt(null)}
+                  className="grid size-9 place-items-center text-[var(--muted)] hover:bg-[var(--canvas)] hover:text-[var(--ink)]"
                 >
-                  <span>
-                    {item.quantity} x {item.name}
-                  </span>
-                  <strong>{money(item.line_total)}</strong>
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="text-center">
+                <div className="brand-mark mx-auto size-14 rounded-2xl">
+                  <Check size={26} />
                 </div>
-              ))}
+                <h2 className="mt-4 text-2xl font-bold">Coffee Gosen</h2>
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  Comprobante de venta
+                </p>
+              </div>
+              <div className="mt-6 border-y border-dashed border-[var(--line)] py-4 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-[var(--muted)]">Venta</span>
+                  <strong>{receipt.sale_number}</strong>
+                </div>
+                <div className="mt-2 flex justify-between">
+                  <span className="text-[var(--muted)]">Comprador</span>
+                  <span>{receipt.customer_name ?? "Venta general"}</span>
+                </div>
+                <div className="mt-2 flex justify-between">
+                  <span className="text-[var(--muted)]">Pago</span>
+                  <span>{paymentLabel[receipt.payment_method]}</span>
+                </div>
+                {receipt.payment_method === "CASH" &&
+                  receipt.amount_received !== null && (
+                    <>
+                      <div className="mt-2 flex justify-between">
+                        <span className="text-[var(--muted)]">Recibido</span>
+                        <span>{money(receipt.amount_received)}</span>
+                      </div>
+                      <div className="mt-2 flex justify-between">
+                        <span className="text-[var(--muted)]">Vuelto</span>
+                        <span>{money(receipt.change_amount)}</span>
+                      </div>
+                    </>
+                  )}
+              </div>
+              <div className="py-4">
+                {receipt.items.map((item) => (
+                  <div
+                    key={item.name}
+                    className="flex justify-between py-2 text-sm"
+                  >
+                    <span>
+                      {item.quantity} x {item.name}
+                    </span>
+                    <strong>{money(item.line_total)}</strong>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-end justify-between border-t-2 border-[var(--ink)] pt-4">
+                <span className="font-semibold">Total</span>
+                <span className="font-heading text-3xl font-bold tracking-tight">{money(receipt.total)}</span>
+              </div>
+              <div className="print:hidden mt-6 grid gap-2 sm:grid-cols-2">
+                <button
+                  onClick={() => window.print()}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 bg-[var(--blue-main)] font-semibold text-white"
+                >
+                  <Printer size={17} /> Imprimir factura
+                </button>
+                <button
+                  type="button"
+                  onClick={exportReceipt}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 border border-[var(--line)] font-semibold text-[var(--blue-main)]"
+                >
+                  <Download size={17} /> Descargar Excel
+                </button>
+              </div>
             </div>
-            <div className="flex justify-between border-t-2 border-[var(--ink)] pt-4 text-xl font-semibold">
-              <span>Total</span>
-              <span>{money(receipt.total)}</span>
-            </div>
-            <div className="print:hidden mt-6 grid gap-2 sm:grid-cols-2">
-              <button
-                onClick={() => window.print()}
-                className="inline-flex min-h-11 items-center justify-center gap-2 bg-[var(--blue-main)] font-semibold text-white"
-              >
-                <Printer size={17} /> Imprimir factura
-              </button>
-              <button
-                type="button"
-                onClick={exportReceipt}
-                className="inline-flex min-h-11 items-center justify-center gap-2 border border-[var(--line)] font-semibold text-[var(--blue-main)]"
-              >
-                <Download size={17} /> Descargar Excel
-              </button>
-            </div>
+            <div className="receipt-edge" aria-hidden="true" />
           </article>
         </div>
       )}

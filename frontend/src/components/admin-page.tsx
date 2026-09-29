@@ -113,66 +113,68 @@ export function AdminPage({ title, description, children }: { title: string; des
     void loadCurrentUser();
   }, [pathname, router]);
 
-  if (!accessChecked) return <main className="grid min-h-screen place-items-center bg-[var(--canvas)] text-sm text-[var(--muted)]">Comprobando permisos...</main>;
+  const CurrentIcon = accessByRoute[pathname]?.icon ?? LayoutDashboard;
+  if (!accessChecked) return <main className="grid min-h-screen place-items-center text-sm text-[var(--muted)]"><span className="flex items-center gap-3"><span className="brand-mark size-9 animate-pulse"><Coffee size={17} /></span>Comprobando permisos...</span></main>;
   return (
-    <main className="min-h-screen bg-[var(--canvas)]">
-      <header className="border-b border-[var(--line)] bg-white px-4 py-4 sm:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
-          <Link href="/dashboard" className="flex items-center gap-3 font-semibold"><span className="grid size-9 place-items-center bg-[var(--blue-main)] text-white"><Coffee size={18} /></span>Coffee Gosen</Link>
+    <main className="min-h-screen">
+      <header className="chrome sticky top-0 z-30 border-b print:hidden">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3.5 sm:px-6 lg:px-8">
+          <Link href="/dashboard" className="flex items-center gap-3 font-heading text-lg font-bold tracking-tight text-white"><span className="brand-mark size-10"><Coffee size={18} /></span>Coffee Gosen</Link>
           <div className="flex items-center gap-2">
             <div className="relative">
-              <button
-                type="button"
-                onClick={() => setMenuOpen((prev) => !prev)}
-                className="inline-flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold text-[var(--ink)] shadow-sm transition hover:border-[var(--blue-main)] hover:text-[var(--blue-main)]"
-              >
-                <span className="grid size-8 place-items-center rounded-lg bg-[var(--blue-light)] text-[var(--blue-main)]"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M4 7h16M4 12h16M4 17h16" /></svg></span>
+              <button type="button" onClick={() => setMenuOpen((prev) => !prev)} aria-expanded={menuOpen} className="chrome-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
                 <span className="hidden sm:inline">Menú</span>
               </button>
               {menuOpen && (
-                <div className="absolute right-0 z-20 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-2xl border border-[var(--line)] bg-white p-2 shadow-xl">
+                <div className="reveal absolute right-0 z-40 mt-3 w-[min(20rem,calc(100vw-2rem))] rounded-2xl border border-[var(--line)] bg-white p-2 text-[var(--ink)] shadow-2xl">
                   <div className="mb-2 flex items-center justify-between px-2 py-1">
                     <strong className="text-sm text-[var(--ink)]">Navegación</strong>
-                    <button type="button" onClick={() => setMenuOpen(false)} className="text-xs text-[var(--muted)]">Cerrar</button>
+                    <button type="button" onClick={() => setMenuOpen(false)} className="px-2 py-1 text-xs text-[var(--muted)] hover:text-[var(--ink)]">Cerrar</button>
                   </div>
-                  <nav className="grid gap-1">
+                  <nav className="grid max-h-[70vh] gap-1 overflow-y-auto">
                     {visibleNavigation.map(({ href, label, icon: Icon }) => (
-                      <Link key={href} href={href} onClick={() => setMenuOpen(false)} className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold ${pathname === href ? "bg-[var(--blue-light)] text-[var(--blue-main)]" : "text-[var(--muted)] hover:bg-[var(--canvas)] hover:text-[var(--ink)]"}`}><span className="grid size-7 place-items-center rounded-lg bg-white text-[var(--blue-main)]"><Icon size={15} /></span>{label}</Link>
+                      <Link key={href} href={href} onClick={() => setMenuOpen(false)} className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${pathname === href ? "bg-[var(--blue-light)] text-[var(--blue-main)]" : "text-[var(--muted)] hover:bg-[var(--canvas)] hover:text-[var(--ink)]"}`}><span className={`grid size-8 place-items-center rounded-lg ${pathname === href ? "bg-[var(--blue-main)] text-white" : "bg-[var(--canvas)] text-[var(--blue-main)]"}`}><Icon size={15} /></span>{label}</Link>
                     ))}
                   </nav>
                 </div>
               )}
             </div>
-            <Link href={homeRoute} className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[var(--muted)] hover:text-[var(--blue-main)]"><ArrowLeft size={16} /> Volver</Link>
+            <Link href={homeRoute} className="chrome-btn"><ArrowLeft size={16} /> Volver</Link>
           </div>
         </div>
-      </header>
-
-      <nav className="hidden border-b border-[var(--line)] bg-white/90 px-4 py-3 backdrop-blur lg:block">
-        <div className="mx-auto flex max-w-7xl gap-2 overflow-x-auto pb-1">
+        <nav className="no-scrollbar mx-auto hidden max-w-7xl gap-1 overflow-x-auto px-4 pb-3 sm:px-6 lg:flex lg:px-8" aria-label="Secciones">
           {visibleNavigation.map(({ href, label, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              className={`inline-flex min-h-12 shrink-0 items-center gap-2 rounded-xl border px-4 text-sm font-semibold transition-colors ${pathname === href ? "border-[var(--blue-main)] bg-[var(--blue-light)] text-[var(--blue-main)]" : "border-[var(--line)] bg-[var(--surface)] text-[var(--muted)] hover:border-[var(--blue-main)] hover:text-[var(--blue-main)]"}`}
-            >
+            <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined} className="nav-pill">
               <Icon size={16} />
               {label}
             </Link>
           ))}
-        </div>
-      </nav>
+        </nav>
+      </header>
 
-      <details className="group border-b border-[var(--line)] bg-white px-4 py-3 sm:px-6 lg:hidden">
-        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--ink)] outline-none ring-0 transition-colors hover:border-[var(--blue-main)] focus:ring-2 focus:ring-[var(--blue-main)] [&::-webkit-details-marker]:hidden">
-          <span className="flex items-center gap-3"><span className="grid size-8 place-items-center rounded-lg bg-[var(--blue-light)] text-[var(--blue-main)]">{(() => { const Icon = accessByRoute[pathname]?.icon ?? LayoutDashboard; return <Icon size={16} />; })()}</span>{accessByRoute[pathname]?.label ?? "Ir a sección"}</span>
+      <details className="group border-b border-[var(--line)] bg-white/80 px-4 py-3 backdrop-blur sm:px-6 lg:hidden print:hidden">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--ink)] shadow-sm transition-colors hover:border-[var(--blue-main)] [&::-webkit-details-marker]:hidden">
+          <span className="flex items-center gap-3"><span className="brand-mark size-9"><CurrentIcon size={16} /></span>{accessByRoute[pathname]?.label ?? "Ir a sección"}</span>
           <ChevronDown aria-hidden="true" size={19} className="text-[var(--muted)] transition-transform group-open:rotate-180" />
         </summary>
-        <nav className="mt-2 grid gap-2 border border-[var(--line)] bg-[var(--canvas)] p-2 sm:grid-cols-2" aria-label="Navegación de secciones">
-          {visibleNavigation.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`flex min-h-12 items-center gap-3 rounded-lg px-3 text-sm font-semibold ${pathname === href ? "bg-[var(--blue-light)] text-[var(--blue-main)]" : "text-[var(--muted)] hover:bg-white hover:text-[var(--ink)]"}`}><Icon size={17} />{label}</Link>)}
+        <nav className="mt-2 grid gap-1 rounded-2xl border border-[var(--line)] bg-[var(--canvas)] p-2 sm:grid-cols-2" aria-label="Navegación de secciones">
+          {visibleNavigation.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`flex min-h-12 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${pathname === href ? "bg-[var(--blue-light)] text-[var(--blue-main)]" : "text-[var(--muted)] hover:bg-white hover:text-[var(--ink)]"}`}><Icon size={17} />{label}</Link>)}
         </nav>
       </details>
-      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10"><p className="text-sm text-[var(--muted)]">Operación</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">{title}</h1><p className="mt-3 max-w-2xl text-[var(--muted)]">{description}</p><div className="mt-8">{children}</div></section>
+
+      <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+        <div className="reveal flex items-start gap-5">
+          <span className="brand-mark hidden size-14 shrink-0 rounded-2xl sm:grid"><CurrentIcon size={24} /></span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-[var(--blue-main)]">Operación</p>
+            <h1 className="page-title mt-2">{title}</h1>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)]">{description}</p>
+            <div className="page-title-rule mt-6" aria-hidden="true" />
+          </div>
+        </div>
+        <div className="mt-10">{children}</div>
+      </section>
     </main>
   );
 }

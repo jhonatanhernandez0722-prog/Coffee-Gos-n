@@ -446,18 +446,18 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[var(--canvas)] lg:grid lg:grid-cols-[248px_1fr]">
-      <aside className="hidden border-r border-[var(--line)] bg-white p-5 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:overflow-y-auto">
+    <main className="min-h-screen lg:grid lg:grid-cols-[264px_1fr]">
+      <aside className="chrome no-scrollbar hidden border-r p-5 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:overflow-y-auto print:hidden">
         <Link
           href="/"
-          className="mb-12 flex items-center gap-3 font-semibold tracking-tight"
+          className="mb-10 flex items-center gap-3 px-1 font-heading text-lg font-bold tracking-tight text-white"
         >
-          <span className="grid size-9 place-items-center bg-[var(--blue-main)] text-white">
+          <span className="brand-mark size-10">
             <Coffee size={18} />
           </span>
           Coffee Gosen
         </Link>
-        <p className="mb-3 px-3 text-xs font-semibold text-[var(--muted)]">
+        <p className="mb-3 px-3 text-xs font-semibold opacity-70">
           Operación
         </p>
         <nav className="space-y-1">
@@ -471,27 +471,31 @@ export default function DashboardPage() {
               <Link
                 key={label}
                 href={href}
-                className={`flex min-h-11 items-center gap-3 px-3 text-sm font-semibold transition ${href === "/dashboard" ? "bg-[var(--blue-light)] text-[var(--blue-main)]" : "text-[var(--muted)] hover:bg-[var(--canvas)] hover:text-[var(--ink)]"}`}
+                aria-current={href === "/dashboard" ? "page" : undefined}
+                className="nav-pill w-full rounded-xl"
               >
                 <Icon size={18} />
                 {label}
               </Link>
             ))}
         </nav>
-        <div className="mt-auto border-t border-[var(--line)] pt-5">
-          <p className="truncate text-sm font-semibold">
+        <div className="mt-auto flex items-center gap-3 rounded-2xl border border-[var(--chrome-line)] bg-white/5 p-3">
+          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--blue-light)] font-heading text-sm font-bold text-[var(--chrome)]">{(userName || "S").charAt(0).toUpperCase()}</span>
+          <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-white">
             {userName || "Sesión de prueba"}
           </p>
-          <p className="text-xs text-[var(--muted)]">
+          <p className="text-xs opacity-70">
             {userName ? "Usuario autenticado" : "Sin autenticación"}
           </p>
+          </div>
         </div>
       </aside>
       <section className="min-w-0">
-        <header className="flex min-h-[72px] items-center justify-between border-b border-[var(--line)] bg-white px-6 lg:px-10">
+        <header className="sticky top-0 z-30 flex min-h-[76px] items-center justify-between border-b border-[var(--line)] bg-white/75 px-6 backdrop-blur-xl lg:px-10 print:static">
           <div>
-            <p className="text-sm text-[var(--muted)]">Resumen operativo</p>
-            <h1 className="mt-1 text-xl font-semibold tracking-tight">
+            <p className="text-sm font-semibold text-[var(--blue-main)]">Resumen operativo</p>
+            <h1 className="mt-0.5 text-2xl font-bold tracking-tight">
               {userName ? `Buen día, ${userName}` : "Dashboard"}
             </h1>
           </div>
@@ -604,7 +608,8 @@ export default function DashboardPage() {
         </header>
         <div className="p-6 lg:p-10">
           {isLoading && (
-            <div className="border border-[var(--line)] bg-white p-8 text-sm text-[var(--muted)]">
+            <div className="flex items-center gap-3 border border-[var(--line)] bg-white p-8 text-sm text-[var(--muted)]">
+              <span className="brand-mark size-9 animate-pulse"><Coffee size={16} /></span>
               Cargando datos del negocio...
             </div>
           )}
@@ -620,10 +625,10 @@ export default function DashboardPage() {
             <>
               <div className="mb-8 flex flex-col gap-4 border-b border-[var(--line)] pb-6 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                  <p className="text-sm text-[var(--muted)]">
+                  <p className="text-sm font-semibold capitalize text-[var(--blue-main)]">
                     {formatDate(summary.date)}
                   </p>
-                  <h2 className="mt-2 text-3xl font-semibold tracking-tight">
+                  <h2 className="page-title mt-2">
                     Resumen del día
                   </h2>
                 </div>
