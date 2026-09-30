@@ -463,6 +463,10 @@ export default function ProductsPage() {
   }
 
   async function toggleProduct(product: Product) {
+    if (product.is_active) {
+      const combos = products.filter((item) => item.is_combo && item.components?.some((component) => component.product_id === product.id));
+      if (combos.length && !window.confirm(`${product.name} forma parte de: ${combos.map((combo) => combo.name).join(", ")}.\n\nSi lo deshabilitas, esos combos dejarán de ofrecerse en Ventas hasta que lo reactives o cambies su composición. ¿Continuar?`)) return;
+    }
     const token = sessionStorage.getItem("coffee_gosen_access_token");
     const response = await fetch(`${apiUrl}/products/${product.id}/${product.is_active ? "disable" : "enable"}`, {
       method: "POST",
@@ -1009,50 +1013,51 @@ export default function ProductsPage() {
 
       <div className="mt-6 grid gap-4 xl:grid-cols-2">
         {visibleProducts.map((product) => (
-          <article key={product.id} className="border border-[var(--line)] bg-white p-4 shadow-sm">
+          <article key={product.id} className={`border border-[var(--line)] bg-white p-5 transition-shadow hover:shadow-[0_18px_36px_-22px_var(--glow)] ${Number(product.stock) <= Number(product.low_stock_threshold) ? "ring-1 ring-amber-300" : ""}`}>
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
                 {imageUrl(product.image_url) ? (
                   <Image
                     src={imageUrl(product.image_url) as string}
                     alt={product.name}
-                    width={52}
-                    height={52}
+                    width={64}
+                    height={64}
                     unoptimized
-                    className="size-12 rounded-sm object-cover"
+                    className="size-16 rounded-2xl border border-[var(--line)] bg-[var(--canvas)] object-contain p-1"
                   />
                 ) : (
-                  <span className="grid size-12 place-items-center bg-[var(--blue-light)]">
-                    <Package size={20} className="text-[var(--blue-main)]" />
+                  <span className="grid size-16 place-items-center rounded-2xl bg-[var(--blue-light)]">
+                    <Package size={24} className="text-[var(--blue-main)]" />
                   </span>
                 )}
                 <div className="min-w-0">
-                  <h3 className="truncate text-base font-semibold">{product.name}</h3>
+                  <h3 className="truncate text-lg font-bold">{product.name}</h3>
                   <p className="text-xs text-[var(--muted)]">{section === "sale" ? `Categoría #${product.category_id}` : section === "desechables" ? "Desechable" : section === "limpieza" ? "Gosen Limpieza" : "Insumo"}</p>
-                  {product.is_combo && <span className="mt-1 inline-flex border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-800">COMBO</span>}
+                  {product.is_combo && <span className="mt-1 inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">Combo</span>}
                 </div>
               </div>
-              <span className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${product.is_active ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-600"}`}>
+              <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${product.is_active ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-600"}`}>
                 {product.is_active ? "Activo" : "Inactivo"}
               </span>
             </div>
 
             <div className="mt-4 grid gap-2 sm:grid-cols-3">
-              <div className="border border-[var(--line)] bg-slate-50 p-3">
-                <p className="text-[11px] uppercase tracking-wide text-[var(--muted)]">{section === "sale" ? "Precio" : "Costo"}</p>
+              <div className="rounded-xl bg-[var(--canvas)] p-3">
+                <p className="text-xs text-[var(--muted)]">{section === "sale" ? "Precio" : "Costo"}</p>
                 <strong className="mt-1 block text-sm">{section === "sale" ? money(product.sale_price) : money(product.acquisition_cost)}</strong>
               </div>
-              <div className="border border-[var(--line)] bg-slate-50 p-3">
-                <p className="text-[11px] uppercase tracking-wide text-[var(--muted)]">Stock</p>
-                <strong className="mt-1 block text-sm">{formatStock(product)}</strong>
+              <div className="rounded-xl bg-[var(--canvas)] p-3">
+                <p className="text-xs text-[var(--muted)]">Stock</p>
+                <strong className={`mt-1 block text-sm ${Number(product.stock) <= Number(product.low_stock_threshold) ? "text-amber-700" : ""}`}>{formatStock(product)}</strong>
+                {Number(product.stock) <= Number(product.low_stock_threshold) && <span className="mt-1 block text-xs font-semibold text-amber-700">Stock bajo</span>}
               </div>
-              <div className="border border-[var(--line)] bg-slate-50 p-3">
-                <p className="text-[11px] uppercase tracking-wide text-[var(--muted)]">Reposición</p>
+              <div className="rounded-xl bg-[var(--canvas)] p-3">
+                <p className="text-xs text-[var(--muted)]">Reposición</p>
                 <strong className="mt-1 block text-sm">+{product.unit === "UNIT" || product.unit === "PAQUETE" ? wholeNumber(product.restock_quantity) : product.restock_quantity}</strong>
               </div>
             </div>
 
-            {product.is_combo && product.components?.length ? <div className="mt-4 border border-amber-200 bg-amber-50 p-3 text-xs"><strong className="text-amber-900">Compuesto por</strong><ul className="mt-2 space-y-1 text-amber-950">{product.components.map((component) => <li key={component.product_id}>{formatComboQuantity(component.quantity)} x {component.product_name ?? products.find((item) => item.id === component.product_id)?.name ?? "Producto"}</li>)}</ul></div> : null}
+            {product.is_combo && product.components?.length ? <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs"><strong className="text-amber-900">Compuesto por</strong><ul className="mt-2 space-y-1 text-amber-950">{product.components.map((component) => <li key={component.product_id}>{formatComboQuantity(component.quantity)} x {component.product_name ?? products.find((item) => item.id === component.product_id)?.name ?? "Producto"}</li>)}</ul></div> : null}
 
             <div className="mt-4 flex flex-wrap gap-2">
               <button

@@ -5,7 +5,7 @@ import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.api.v1.dependencies import get_current_user, require_admin
 from app.core.permissions import require_any_section, require_section
@@ -123,7 +123,14 @@ def list_products(
     if not include_disabled:
         statement = statement.where(Product.is_active.is_(True))
     if saleable_only:
-        statement = statement.where(Product.is_saleable.is_(True))
+        component = aliased(Product)
+        unavailable_component = (
+            select(ComboComponent.id)
+            .join(component, component.id == ComboComponent.component_product_id)
+            .where(ComboComponent.combo_product_id == Product.id, (component.is_active.is_(False)) | (component.is_saleable.is_(False)))
+            .exists()
+        )
+        statement = statement.where(Product.is_saleable.is_(True), ~unavailable_component)
     return list(database.scalars(statement))
 
 
@@ -228,9 +235,7 @@ def disable_product(
     product = database.get(Product, product_id)
     if product is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    used_by_combo = database.scalar(select(ComboComponent.id).where(ComboComponent.component_product_id == product_id).limit(1))
-    if used_by_combo:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Este producto forma parte de un combo y no se puede deshabilitar")
+    # Los combos que lo usan dejan de ofrecerse en ventas hasta reactivarlo o cambiar su composición.
     product.is_active = False
     database.commit()
     database.refresh(product)

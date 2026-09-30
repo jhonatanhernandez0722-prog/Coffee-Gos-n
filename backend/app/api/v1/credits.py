@@ -8,7 +8,7 @@ from app.api.v1.dependencies import require_admin
 from app.core.permissions import require_section
 from app.db.session import get_db
 from app.models import Credit, Customer, FinancialMovement, InventoryMovement, Product, Sale, SaleItem, SaleSupport, User
-from app.schemas.credits import CreditPaymentCreate, CreditProduct, CreditRow, CreditsResponse
+from app.schemas.credits import CreditPayment, CreditPaymentCreate, CreditProduct, CreditRow, CreditsResponse
 
 router = APIRouter(prefix="/credits", tags=["credits"])
 
@@ -105,6 +105,14 @@ def list_credits(
         .join(Product, Product.id == SaleItem.product_id)
         .where(SaleItem.sale_id.in_(sale_ids))
     ).all() if sale_ids else []
+    payment_rows = database.scalars(
+        select(FinancialMovement)
+        .where(FinancialMovement.sale_id.in_(sale_ids), FinancialMovement.movement_type == "INCOME")
+        .order_by(FinancialMovement.created_at)
+    ).all() if sale_ids else []
+    payments: dict[int, list[CreditPayment]] = {}
+    for payment in payment_rows:
+        payments.setdefault(payment.sale_id, []).append(CreditPayment(amount=payment.amount, payment_method=payment.payment_method, created_at=payment.created_at))
     support_urls: dict[int, list[str]] = {}
     for support in supports:
         support_urls.setdefault(support.sale_id, []).append(support.file_url)
@@ -124,4 +132,5 @@ def list_credits(
         created_at=credit.created_at,
         products=products.get(credit.sale_id, []),
         support_urls=support_urls.get(credit.sale_id, []),
+        payments=payments.get(credit.sale_id, []),
     ) for credit, sale_number, customer_name, seller_name, cashier_name in rows])

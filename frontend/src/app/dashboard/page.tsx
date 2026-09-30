@@ -2,11 +2,17 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,
   BarChart3,
   Bell,
+  FileSpreadsheet,
+  FileDown,
+  ChevronRight,
+  ChevronLeft,
+  CalendarDays,
+  Check,
   CircleDollarSign,
   Coffee,
   CreditCard,
@@ -28,7 +34,9 @@ import {
   Volume2,
 } from "lucide-react";
 import { apiUrl, userFacingError } from "@/lib/api";
+import { NavDrawer } from "@/components/nav-drawer";
 import { downloadExcel } from "@/lib/excel";
+import { downloadPdfReport } from "@/lib/pdf";
 
 type DashboardSummary = {
   date: string;
@@ -48,6 +56,28 @@ type DashboardSummary = {
   low_stock_products: number;
   products: MonthlyProduct[];
 };
+/** Fecha de hoy en la zona horaria del equipo (no en UTC). */
+function localToday() {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+function shiftDate(value: string, days: number) {
+  const date = new Date(`${value}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+function greeting() {
+  const hour = new Date().getHours();
+  return hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches";
+}
+function timeAgo(value: string) {
+  const minutes = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 60000));
+  if (minutes < 1) return "ahora";
+  if (minutes < 60) return `hace ${minutes} min`;
+  const hours = Math.round(minutes / 60);
+  return hours < 24 ? `hace ${hours} h` : new Date(value).toLocaleDateString("es-CO");
+}
+
 type AlertItem = {
   id: string;
   kind: "LOW_STOCK" | "SALE";
@@ -215,9 +245,25 @@ export default function DashboardPage() {
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [unreadAlerts, setUnreadAlerts] = useState(0);
   const [alertsOpen, setAlertsOpen] = useState(false);
+  const alertsRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!alertsOpen) return;
+    const closeOnOutside = (event: MouseEvent) => {
+      if (alertsRef.current && !alertsRef.current.contains(event.target as Node)) setAlertsOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setAlertsOpen(false); };
+    document.addEventListener("mousedown", closeOnOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [alertsOpen]);
   const knownAlertIds = useRef<Set<string> | null>(null);
   const unreadEventIds = useRef(new Set<string>());
   const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
   const [monthlyReport, setMonthlyReport] = useState<MonthlyReport | null>(
     null,
   );
@@ -248,9 +294,7 @@ export default function DashboardPage() {
     };
     void loadCurrentUser();
   }, [router]);
-  const [selectedDate, setSelectedDate] = useState(() =>
-    new Date().toISOString().slice(0, 10),
-  );
+  const [selectedDate, setSelectedDate] = useState(localToday);
 
   useEffect(() => {
     const token = sessionStorage.getItem("coffee_gosen_access_token");
@@ -420,6 +464,38 @@ export default function DashboardPage() {
     ? [balanceMetric, ...dailyMetrics, ...operatingMetrics]
     : [];
   const dailyProducts = summary?.products ?? [];
+  async function exportSummaryPdf() {
+    if (!summary) return;
+    setError("");
+    try {
+      await downloadPdfReport({
+        title: "Resumen del día",
+        subtitle: formatDate(summary.date),
+        filename: `resumen-${summary.date}.pdf`,
+        summary: metrics.slice(0, 4).map((metric) => [metric.label, metric.value]),
+        sections: [
+          {
+            heading: "Indicadores",
+            columns: ["Indicador", "Valor", "Detalle"],
+            rows: metrics.map((metric) => [metric.label, metric.value, metric.detail]),
+          },
+          {
+            heading: "Rentabilidad por producto del día",
+            columns: ["Producto", "Unidades", "Precio venta", "Ventas", "Costo", "Ganancia"],
+            rows: dailyProducts.map((product) => [product.product_name, formatUnits(Number(product.units_sold)), formatCurrency(product.unit_price), formatCurrency(product.sales_total), formatCurrency(product.cost_total), formatCurrency(product.profit_total)]),
+            emptyText: "No hay ventas cobradas para calcular rentabilidad en este día.",
+          },
+          ...(monthlyReport ? [{
+            heading: `Resumen mensual (${reportMonth})`,
+            columns: ["Día", "Ingresos cobrados", "Egresos", "Ventas"],
+            rows: monthlyReport.days.map((day, index) => [day, formatCurrency(monthlyReport.income_by_day[index]), formatCurrency(monthlyReport.expenses_by_day[index]), monthlyReport.sales_by_day[index]]),
+          }] : []),
+        ],
+      });
+    } catch {
+      setError("No fue posible generar el PDF del resumen.");
+    }
+  }
   function exportSummary() {
     if (!summary) return;
     downloadExcel(
@@ -492,64 +568,68 @@ export default function DashboardPage() {
         </div>
       </aside>
       <section className="min-w-0">
-        <header className="sticky top-0 z-30 flex min-h-[76px] items-center justify-between border-b border-[var(--line)] bg-white/75 px-6 backdrop-blur-xl lg:px-10 print:static">
-          <div>
-            <p className="text-sm font-semibold text-[var(--blue-main)]">Resumen operativo</p>
-            <h1 className="mt-0.5 text-2xl font-bold tracking-tight">
-              {userName ? `Buen día, ${userName}` : "Dashboard"}
-            </h1>
+        <header className="sticky top-0 z-30 flex min-h-[76px] items-center justify-between gap-3 border-b border-[var(--line)] bg-white/75 px-4 backdrop-blur-xl sm:px-6 lg:px-10 print:static">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="shrink-0 lg:hidden"><span className="brand-mark size-10"><Coffee size={18} /></span></span>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold text-[var(--blue-main)] sm:text-sm">
+                {summary ? <>{greeting()} · <span className="inline-block first-letter:uppercase">{new Date(`${summary.date}T12:00:00`).toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" })}</span></> : "Resumen operativo"}
+              </p>
+              <h1 className="mt-0.5 truncate text-lg font-bold tracking-tight sm:text-2xl">
+                {userName || "Resumen operativo"}
+              </h1>
+            </div>
           </div>
-          <div className="ml-auto flex items-center gap-2">
-            <div className="relative">
+          <div className="flex shrink-0 items-center gap-1 rounded-2xl border border-[var(--line)] bg-white/90 p-1 shadow-sm">
+            <div ref={alertsRef} className="relative">
               <button
-                aria-label={`Ver notificaciones${unreadAlerts ? ` (${unreadAlerts})` : ""}`}
+                type="button"
+                aria-label={`Ver alertas${unreadAlerts ? ` (${unreadAlerts} sin leer)` : ""}`}
+                aria-expanded={alertsOpen}
                 onClick={() => void openAlerts()}
-                className="relative grid size-11 place-items-center rounded-xl border border-[var(--line)] bg-white text-[var(--muted)] shadow-sm transition hover:border-[var(--blue-main)] hover:text-[var(--blue-main)]"
+                className={`relative grid size-10 place-items-center transition ${alertsOpen ? "bg-[var(--blue-light)] text-[var(--blue-main)]" : "text-[var(--muted)] hover:bg-[var(--canvas)] hover:text-[var(--ink)]"}`}
               >
-                <Bell size={18} />
+                <Bell size={19} className={unreadAlerts > 0 ? "bell-ring" : ""} />
                 {unreadAlerts > 0 && (
-                  <span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-[var(--blue-main)] px-1 text-[10px] font-bold text-white">
+                  <span className="absolute right-1 top-1 grid min-w-[18px] place-items-center rounded-full border-2 border-white bg-red-600 px-1 text-[10px] font-bold leading-4 text-white">
                     {unreadAlerts > 9 ? "9+" : unreadAlerts}
                   </span>
                 )}
               </button>
               {alertsOpen && (
-                <div className="fixed left-1/2 top-24 z-50 w-[min(22rem,calc(100vw-1.5rem))] -translate-x-1/2 border border-[var(--line)] bg-white shadow-xl">
-                  <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
-                    <strong className="text-sm">Alertas</strong>
-                    <span className="text-xs text-[var(--muted)]">
-                      Últimas 24 horas
-                    </span>
+                <div className="pop absolute -right-24 top-full z-50 mt-3 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[var(--line)] bg-white shadow-2xl sm:right-0">
+                  <div className="screen !rounded-none flex items-center justify-between px-4 py-3.5">
+                    <div className="flex items-center gap-2">
+                      <Bell size={16} />
+                      <strong className="text-sm">Alertas</strong>
+                      {alerts.length > 0 && <span className="rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold">{alerts.length}</span>}
+                    </div>
+                    <span className="screen-label text-xs">Últimas 24 horas</span>
                   </div>
-                  <div className="max-h-96 overflow-y-auto">
+                  <div className="max-h-[26rem] overflow-y-auto">
                     {alerts.length === 0 ? (
-                      <p className="p-5 text-sm text-[var(--muted)]">
-                        No hay alertas nuevas.
-                      </p>
+                      <div className="grid place-items-center gap-2 px-6 py-10 text-center">
+                        <span className="grid size-12 place-items-center rounded-2xl bg-emerald-50 text-emerald-700"><Check size={22} /></span>
+                        <p className="text-sm font-semibold">Todo en orden</p>
+                        <p className="text-xs text-[var(--muted)]">No hay alertas nuevas por ahora.</p>
+                      </div>
                     ) : (
                       alerts.map((alert) => (
                         <Link
                           key={alert.id}
                           href={alert.href ?? "#"}
                           onClick={() => setAlertsOpen(false)}
-                          className="flex gap-3 border-b border-[var(--line)] p-4 hover:bg-[var(--canvas)]"
+                          className="flex gap-3 border-b border-[var(--line)] px-4 py-3.5 transition-colors last:border-0 hover:bg-[var(--canvas)]"
                         >
-                          <span
-                            className={`mt-0.5 ${alert.kind === "LOW_STOCK" ? "text-amber-600" : "text-[var(--blue-main)]"}`}
-                          >
-                            {alert.kind === "LOW_STOCK" ? (
-                              <TriangleAlert size={17} />
-                            ) : (
-                              <ShoppingBag size={17} />
-                            )}
+                          <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${alert.kind === "LOW_STOCK" ? "bg-amber-50 text-amber-600" : "bg-[var(--blue-light)] text-[var(--blue-main)]"}`}>
+                            {alert.kind === "LOW_STOCK" ? <TriangleAlert size={17} /> : <ShoppingBag size={17} />}
                           </span>
-                          <span className="min-w-0">
-                            <strong className="block text-sm">
-                              {alert.title}
-                            </strong>
-                            <span className="mt-1 block text-xs leading-5 text-[var(--muted)]">
-                              {alert.detail}
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-start justify-between gap-2">
+                              <strong className="text-sm leading-5">{alert.title}</strong>
+                              {alert.created_at && <span className="shrink-0 text-[11px] text-[var(--muted)]">{timeAgo(alert.created_at)}</span>}
                             </span>
+                            <span className="mt-0.5 block text-xs leading-5 text-[var(--muted)]">{alert.detail}</span>
                           </span>
                         </Link>
                       ))
@@ -559,50 +639,34 @@ export default function DashboardPage() {
               )}
             </div>
 
-            <div className="relative lg:hidden">
+            <span className="lg:hidden">
               <button
+                type="button"
                 aria-label="Abrir menú de navegación"
-                onClick={() => setMenuOpen((prev) => !prev)}
-                className="flex items-center justify-center rounded-xl border border-[var(--line)] bg-white p-2 text-[var(--ink)] shadow-sm transition hover:border-[var(--blue-main)] hover:text-[var(--blue-main)]"
+                aria-expanded={menuOpen}
+                onClick={() => setMenuOpen(true)}
+                className="flex h-10 items-center gap-2 px-3 text-sm font-semibold text-[var(--muted)] transition hover:bg-[var(--canvas)] hover:text-[var(--ink)]"
               >
-                <span className="grid size-8 place-items-center rounded-lg bg-[var(--blue-light)] text-[var(--blue-main)]">
-                  <Menu size={16} />
-                </span>
+                <Menu size={18} />
+                <span className="hidden sm:inline">Menú</span>
               </button>
+            </span>
+            <NavDrawer
+              items={navigation.filter(({ adminOnly, permission }) => isAdmin || permission === "configuracion" || (!adminOnly && currentUser?.permissions?.includes(permission)))}
+              activeHref="/dashboard"
+              open={menuOpen}
+              onClose={closeMenu}
+            />
 
-              {menuOpen && (
-                <div className="fixed left-1/2 top-24 z-50 w-[min(18rem,calc(100vw-1.5rem))] -translate-x-1/2 rounded-2xl border border-[var(--line)] bg-white p-2 shadow-xl">
-                  <div className="mb-2 flex items-center justify-between px-2 py-1">
-                    <strong className="text-sm text-[var(--ink)]">Navegación</strong>
-                    <button type="button" onClick={() => setMenuOpen(false)} className="text-xs text-[var(--muted)]">Cerrar</button>
-                  </div>
-                  <nav className="grid gap-1">
-                    {navigation
-                      .filter(({ adminOnly, permission }) => isAdmin || permission === "configuracion" || (!adminOnly && currentUser?.permissions?.includes(permission)))
-                      .map(({ label, href, icon: Icon }) => (
-                        <Link
-                          key={label}
-                          href={href}
-                          onClick={() => setMenuOpen(false)}
-                          className={`flex items-center gap-2 rounded-xl px-2 py-2 text-[11px] font-semibold ${href === "/dashboard" ? "bg-[var(--blue-light)] text-[var(--blue-main)]" : "text-[var(--muted)] hover:bg-[var(--canvas)] hover:text-[var(--ink)]"}`}
-                        >
-                          <span className="grid size-6 place-items-center rounded-md bg-[var(--blue-light)] text-[var(--blue-main)]">
-                            <Icon size={12} />
-                          </span>
-                          <span className="truncate">{label}</span>
-                        </Link>
-                      ))}
-                  </nav>
-                </div>
-              )}
-            </div>
-
+            <span className="mx-0.5 h-6 w-px bg-[var(--line)]" aria-hidden="true" />
             <Link
               href="/"
               aria-label="Cerrar sesión"
-              className="grid size-11 place-items-center rounded-xl border border-[var(--line)] bg-white text-[var(--muted)] shadow-sm transition hover:border-[var(--blue-main)] hover:text-[var(--blue-main)]"
+              onClick={() => { sessionStorage.removeItem("coffee_gosen_access_token"); sessionStorage.removeItem("coffee_gosen_user"); window.dispatchEvent(new Event("coffee-gosen-auth")); }}
+              className="inline-flex h-10 items-center gap-2 px-3 text-sm font-semibold text-[var(--muted)] transition hover:bg-red-50 hover:text-red-700"
             >
               <LogOut size={17} />
+              <span className="hidden sm:inline">Salir</span>
             </Link>
           </div>
         </header>
@@ -623,40 +687,64 @@ export default function DashboardPage() {
           )}
           {!isLoading && !error && summary && (
             <>
-              <div className="mb-8 flex flex-col gap-4 border-b border-[var(--line)] pb-6 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold capitalize text-[var(--blue-main)]">
-                    {formatDate(summary.date)}
-                  </p>
-                  <h2 className="page-title mt-2">
-                    Resumen del día
-                  </h2>
+              <section className="mb-8 flex flex-col gap-6 border border-[var(--line)] bg-white p-5 sm:p-6 xl:flex-row xl:items-center xl:justify-between">
+                <div className="flex items-center gap-4">
+                  <span className="brand-mark hidden size-14 shrink-0 rounded-2xl sm:grid"><CalendarDays size={24} /></span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-[var(--blue-main)] first-letter:uppercase">
+                        {new Date(`${summary.date}T12:00:00`).toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                      </p>
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${selectedDate === localToday() ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>
+                        {selectedDate === localToday() ? "Hoy" : "Día anterior"}
+                      </span>
+                    </div>
+                    <h2 className="page-title mt-1 !text-4xl sm:!text-5xl">Resumen del día</h2>
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-3 print:hidden">
-                  <label className="text-sm font-semibold">
-                    Día
-                    <input
-                      type="date"
-                      value={selectedDate}
-                      onChange={(event) => setSelectedDate(event.target.value)}
-                      className="ml-2 min-h-10 border border-[var(--line)] px-3 font-normal"
-                    />
-                  </label>
-                  <button
-                    onClick={() => window.print()}
-                    className="inline-flex min-h-10 items-center gap-2 bg-[var(--blue-main)] px-4 text-sm font-semibold text-white"
-                  >
-                    <Download size={16} /> Exportar PDF
-                  </button>
-                  <button
-                    type="button"
-                    onClick={exportSummary}
-                    className="inline-flex min-h-10 items-center gap-2 border border-[var(--line)] bg-white px-4 text-sm font-semibold text-[var(--blue-main)]"
-                  >
-                    <Download size={16} /> Descargar Excel
-                  </button>
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center print:hidden">
+                  <div className="flex items-center gap-1 rounded-2xl border border-[var(--line)] bg-[var(--canvas)] p-1">
+                    <button type="button" aria-label="Día anterior" onClick={() => setSelectedDate(shiftDate(selectedDate, -1))} className="grid size-10 place-items-center text-[var(--muted)] transition hover:bg-white hover:text-[var(--ink)]">
+                      <ChevronLeft size={18} />
+                    </button>
+                    <label className="relative">
+                      <span className="sr-only">Seleccionar día</span>
+                      <input
+                        type="date"
+                        value={selectedDate}
+                        max={localToday()}
+                        onChange={(event) => event.target.value && setSelectedDate(event.target.value)}
+                        className="h-10 min-w-0 !border-0 !bg-white px-3 text-sm font-semibold !shadow-sm"
+                      />
+                    </label>
+                    <button type="button" aria-label="Día siguiente" disabled={selectedDate >= localToday()} onClick={() => setSelectedDate(shiftDate(selectedDate, 1))} className="grid size-10 place-items-center text-[var(--muted)] transition hover:bg-white hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent">
+                      <ChevronRight size={18} />
+                    </button>
+                    {selectedDate !== localToday() && (
+                      <button type="button" onClick={() => setSelectedDate(localToday())} className="h-10 px-3 text-sm font-semibold text-[var(--blue-main)] transition hover:bg-white">
+                        Hoy
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 rounded-2xl border border-[var(--line)] bg-white p-1 shadow-sm">
+                    <span className="hidden px-2 text-xs font-semibold text-[var(--muted)] sm:inline">Exportar</span>
+                    <button
+                      type="button"
+                      onClick={() => void exportSummaryPdf()}
+                      className="inline-flex h-10 flex-1 items-center justify-center gap-2 bg-[var(--blue-main)] px-4 text-sm font-semibold text-white"
+                    >
+                      <FileDown size={17} /> PDF
+                    </button>
+                    <button
+                      type="button"
+                      onClick={exportSummary}
+                      className="inline-flex h-10 flex-1 items-center justify-center gap-2 px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"
+                    >
+                      <FileSpreadsheet size={17} /> Excel
+                    </button>
+                  </div>
                 </div>
-              </div>
+              </section>
               <div className="grid gap-px overflow-hidden border border-[var(--line)] bg-[var(--line)] sm:grid-cols-2 xl:grid-cols-3">
                 {metrics.map(({ label, value, detail, icon: Icon, href }) =>
                   href ? (

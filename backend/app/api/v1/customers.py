@@ -63,7 +63,7 @@ def customers_summary(
     rows = database.execute(
         select(Customer, purchase_count, total_spent, pending_credit, last_purchase)
         .where(Customer.is_active.is_(True))
-        .order_by(Customer.name)
+        .order_by(last_purchase.desc().nulls_last(), Customer.created_at.desc())
     ).all()
     customers = [CustomerSummary(id=customer.id, name=customer.name, phone=customer.phone, purchase_count=int(count), total_spent=total_spent or Decimal("0"), pending_credit=pending_credit or Decimal("0"), last_purchase_at=last_purchase_at) for customer, count, total_spent, pending_credit, last_purchase_at in rows]
     return CustomersDashboard(

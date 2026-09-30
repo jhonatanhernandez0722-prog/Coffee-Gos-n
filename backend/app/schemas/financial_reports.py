@@ -47,6 +47,7 @@ class LiabilityResponse(BaseModel):
 
 
 class BalanceReport(BaseModel):
+    month: str | None = None
     cash: Decimal
     bank: Decimal
     receivables: Decimal
@@ -57,5 +58,6 @@ class BalanceReport(BaseModel):
     equity: Decimal
     income: Decimal
     costs: Decimal
+    damage_costs: Decimal = Decimal("0")
     expenses: Decimal
     profit: Decimal

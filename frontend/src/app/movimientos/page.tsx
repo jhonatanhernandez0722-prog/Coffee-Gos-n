@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Download, Pencil, Trash2 } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
 import { apiUrl, userFacingError } from "@/lib/api";
+import { downloadPdfReport } from "@/lib/pdf";
 
 type Movement = {
   id: number;
@@ -18,6 +19,7 @@ type Movement = {
   product_name: string | null;
   seller_name: string | null;
   customer_name: string | null;
+  payment_method: "CASH" | "NEQUI" | "CREDIT" | null;
   source_combo_product_id: number | null;
   created_at: string;
 };
@@ -67,7 +69,35 @@ const labels: Record<string, string> = {
   DAMAGE: "Pérdida por daño",
   INCOME: "Ingreso",
   EXPENSE: "Egreso",
+  COST: "Costo por daño",
 };
+const paymentLabels: Record<string, string> = {
+  CASH: "Efectivo",
+  NEQUI: "Transferencia (Nequi)",
+  CREDIT: "Crédito",
+};
+const typeStyles: Record<string, string> = {
+  SALE: "border-sky-200 bg-sky-50 text-sky-800",
+  PURCHASE: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  ADJUSTMENT: "border-slate-200 bg-slate-50 text-slate-700",
+  INTERNAL_USE: "border-indigo-200 bg-indigo-50 text-indigo-800",
+  DAMAGE: "border-red-200 bg-red-50 text-red-700",
+  INCOME: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  EXPENSE: "border-orange-200 bg-orange-50 text-orange-800",
+  COST: "border-red-200 bg-red-50 text-red-700",
+};
+const paymentStyles: Record<string, string> = {
+  CASH: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  NEQUI: "border-violet-200 bg-violet-50 text-violet-800",
+  CREDIT: "border-amber-200 bg-amber-50 text-amber-800",
+};
+
+function periodLabel(dateFrom: string, dateTo: string) {
+  if (dateFrom && dateTo) return `Del ${dateFrom} al ${dateTo}`;
+  if (dateFrom) return `Desde ${dateFrom}`;
+  if (dateTo) return `Hasta ${dateTo}`;
+  return "Últimos movimientos";
+}
 
 export default function MovementsPage() {
   const [movements, setMovements] = useState<Movement[]>([]);
@@ -313,7 +343,7 @@ export default function MovementsPage() {
           <div className="border-b border-[var(--line)] p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <h2 className="font-semibold">Registro universal</h2>
+                <h2 className="text-lg font-bold">Registro universal</h2>
                 <p className="mt-1 text-sm text-[var(--muted)]">
                   {movements.length} movimientos encontrados
                 </p>
@@ -351,13 +381,38 @@ export default function MovementsPage() {
                     <option value="PURCHASE">Entrada de inventario</option>
                     <option value="INTERNAL_USE">Uso interno</option>
                     <option value="ADJUSTMENT">Ajuste</option>
+                    <option value="DAMAGE">Pérdida por daño</option>
                   </select>
                 </label>
                 <button
-                  onClick={() => window.print()}
-                  className="inline-flex min-h-10 items-center gap-2 bg-[var(--blue-main)] px-4 text-sm font-semibold text-white"
+                  type="button"
+                  disabled={movements.length === 0}
+                  onClick={() =>
+                    void downloadPdfReport({
+                      title: "Registro de movimientos",
+                      subtitle: `${periodLabel(dateFrom, dateTo)}${movementType ? ` · ${labels[movementType] ?? movementType}` : ""}`,
+                      filename: `movimientos-${dateFrom || "inicio"}-${dateTo || "hoy"}.pdf`,
+                      orientation: "landscape",
+                      summary: [["Movimientos", String(movements.length)]],
+                      sections: [{
+                        heading: "Detalle",
+                        columns: ["Fecha", "Detalle", "Cantidad", "Monto", "Pago", "Vendedor", "Comprador", "Movimiento"],
+                        rows: movements.map((movement) => [
+                          new Date(movement.created_at).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }),
+                          movement.product_name ?? movement.concept,
+                          movement.quantity !== null ? quantityLabel(movement.quantity) : "-",
+                          movement.amount !== null ? money(Number(movement.amount)) : "-",
+                          movement.payment_method ? paymentLabels[movement.payment_method] ?? movement.payment_method : "-",
+                          movement.seller_name ?? "-",
+                          movement.customer_name ?? "-",
+                          labels[movement.movement_type] ?? movement.movement_type,
+                        ]),
+                      }],
+                    }).catch(() => setError("No fue posible generar el PDF de movimientos."))
+                  }
+                  className="inline-flex min-h-10 items-center gap-2 bg-[var(--blue-main)] px-4 text-sm font-semibold text-white disabled:opacity-50"
                 >
-                  <Download size={16} /> Exportar PDF
+                  <Download size={16} /> Descargar PDF
                 </button>
               </div>
             </div>
@@ -400,6 +455,11 @@ export default function MovementsPage() {
                           Monto: {money(movement.amount)}
                         </div>
                       )}
+                      {movement.payment_method && (movement.movement_type === "SALE" || movement.movement_type === "INCOME" || movement.movement_type === "EXPENSE") && (
+                        <span className={`mt-2 inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${paymentStyles[movement.payment_method] ?? "border-[var(--line)] text-[var(--muted)]"}`}>
+                          Pago: {paymentLabels[movement.payment_method] ?? movement.payment_method}
+                        </span>
+                      )}
                       {movement.source_combo_product_id !== null && (
                         <div className="mt-1 text-xs font-semibold text-amber-700">Componente consumido por un combo</div>
                       )}
@@ -411,7 +471,7 @@ export default function MovementsPage() {
                       {movement.customer_name ?? "-"}
                     </td>
                     <td className="p-4">
-                      <span className="inline-flex rounded-full border border-[var(--line)] bg-slate-50 px-2 py-1 text-xs font-semibold text-[var(--ink)]">
+                      <span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${typeStyles[movement.movement_type] ?? "border-[var(--line)] bg-slate-50 text-[var(--ink)]"}`}>
                         {labels[movement.movement_type] ??
                           movement.movement_type}
                       </span>

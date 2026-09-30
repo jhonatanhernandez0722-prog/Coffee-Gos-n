@@ -79,14 +79,14 @@ export default function ConfiguracionPage() {
       <section className="max-w-2xl border border-[var(--line)] bg-white p-6">
         <div className="flex items-start justify-between gap-6">
           <div className="flex items-start gap-4">
-            <span className="grid size-11 place-items-center bg-[var(--blue-light)] text-[var(--blue-main)]"><Bell size={21} /></span>
+            <span className="brand-mark size-11 shrink-0"><Bell size={20} /></span>
             <div>
               <h2 className="font-semibold">Sonido de la campana</h2>
               <p className="mt-1 text-sm leading-6 text-[var(--muted)]">Reproduce un fragmento diferente del sonido cuando aparece una alerta nueva.</p>
             </div>
           </div>
-          <button type="button" role="switch" aria-checked={soundEnabled} aria-label="Activar sonido de la campana" onClick={() => updateSoundEnabled(!soundEnabled)} className={`relative inline-flex min-h-11 min-w-20 items-center border-2 px-2 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--blue-main)] ${soundEnabled ? "justify-end border-[var(--blue-main)] bg-[var(--blue-main)]" : "justify-start border-[var(--line)] bg-[var(--surface)]"}`}>
-            <span className="grid size-7 place-items-center bg-white text-[var(--blue-main)] shadow-sm">{soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}</span>
+          <button type="button" role="switch" aria-checked={soundEnabled} aria-label="Activar sonido de la campana" onClick={() => updateSoundEnabled(!soundEnabled)} className={`relative inline-flex h-10 w-[4.5rem] shrink-0 items-center !rounded-full border-2 px-1 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--blue-main)] ${soundEnabled ? "justify-end border-[var(--blue-main)] bg-[var(--blue-main)]" : "justify-start border-[var(--line)] bg-[var(--canvas)]"}`}>
+            <span className="grid size-7 place-items-center rounded-full bg-white text-[var(--blue-main)] shadow-sm">{soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}</span>
           </button>
         </div>
         <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-[var(--line)] pt-5">
@@ -96,7 +96,7 @@ export default function ConfiguracionPage() {
       </section>
       {isAdmin && <section className="mt-6 max-w-2xl border border-amber-200 bg-white p-6">
         <div className="flex items-start gap-4">
-          <span className="grid size-11 place-items-center bg-amber-50 text-amber-700"><ShieldCheck size={21} /></span>
+          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-700"><ShieldCheck size={21} /></span>
           <div><h2 className="font-semibold">Corrección de saldo inicial</h2><p className="mt-1 text-sm leading-6 text-[var(--muted)]">Solo modifica el efectivo y Nequi con los que se abrió la caja. No cambia ventas, compras, inventario, créditos ni egresos.</p></div>
         </div>
         {balanceError && <p role="alert" className="mt-5 border border-red-200 bg-red-50 p-4 text-sm text-red-700">{balanceError}</p>}

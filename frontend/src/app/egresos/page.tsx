@@ -627,6 +627,21 @@ export default function ExpensesPage() {
           </div>
         </div>
       )}
+      <div className="mb-6 grid gap-3 sm:grid-cols-3">
+        <article className="screen p-6">
+          <p className="screen-label text-sm">Egresos aplicados</p>
+          <strong className="screen-amount mt-4 block text-3xl">{money(expenses.filter((expense) => expense.settled_at).reduce((sum, expense) => sum + Number(expense.amount), 0))}</strong>
+        </article>
+        <article className="border border-[var(--line)] bg-white p-6">
+          <p className="text-sm text-[var(--muted)]">Pendientes de cierre</p>
+          <strong className="screen-amount mt-4 block text-3xl text-amber-700">{money(pendingExpenses.reduce((sum, expense) => sum + Number(expense.amount), 0))}</strong>
+          <p className="mt-1 text-xs text-[var(--muted)]">{pendingExpenses.length} registro(s) por aplicar</p>
+        </article>
+        <article className="border border-[var(--line)] bg-white p-6">
+          <p className="text-sm text-[var(--muted)]">Registros</p>
+          <strong className="screen-amount mt-4 block text-3xl">{expenses.length}</strong>
+        </article>
+      </div>
       <div className="mb-4 flex flex-wrap gap-3">
         <button
           type="button"
@@ -644,15 +659,15 @@ export default function ExpensesPage() {
           Registrar egreso de cierre ({pendingExpenses.length})
         </button>
       </div>
-      <div className="grid w-full min-w-0 grid-cols-2 items-start gap-3 xl:gap-6 xl:grid-cols-[minmax(300px,360px)_minmax(0,1fr)] [&>form]:min-w-0 [&>section]:min-w-0">
+      <div className="grid w-full min-w-0 grid-cols-1 items-start gap-4 xl:gap-6 xl:grid-cols-[minmax(300px,360px)_minmax(0,1fr)] [&>form]:min-w-0 [&>section]:min-w-0">
         <form
           onSubmit={(event) => void saveExpense(event)}
-          className="border border-[var(--ink)] bg-white p-5"
+          className="border border-[var(--line)] bg-white p-5 xl:sticky xl:top-32"
         >
           <div className="flex items-center gap-3 border-b border-[var(--line)] pb-4">
-            <Banknote className="text-[var(--blue-main)]" size={22} />
+            <span className="brand-mark size-11 shrink-0"><Banknote size={20} /></span>
             <div>
-              <h2 className="font-semibold">Nuevo egreso</h2>
+              <h2 className="text-lg font-bold">Nuevo egreso</h2>
               <p className="text-sm text-[var(--muted)]">
                 Se reflejará en Movimientos.
               </p>
@@ -773,9 +788,9 @@ export default function ExpensesPage() {
         <section className="border border-[var(--line)] bg-white">
           <div className="border-b border-[var(--line)] p-5">
             <div className="flex items-center gap-3">
-              <ReceiptText className="text-[var(--blue-main)]" size={22} />
+              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[var(--blue-light)] text-[var(--blue-main)]"><ReceiptText size={20} /></span>
               <div>
-                <h2 className="font-semibold">Egresos registrados</h2>
+                <h2 className="text-lg font-bold">Egresos registrados</h2>
                 <p className="mt-1 text-sm text-[var(--muted)]">
                   {expenses.length} registros
                 </p>

@@ -7,6 +7,7 @@ import {
   Check,
   CreditCard,
   Download,
+  FileDown,
   ImagePlus,
   Layers,
   ReceiptText,
@@ -16,6 +17,7 @@ import {
   Plus,
   Printer,
   Search,
+  Send,
   ShoppingBag,
   Trash2,
   X,
@@ -23,6 +25,7 @@ import {
 import { AdminPage } from "@/components/admin-page";
 import { apiUrl, userFacingError } from "@/lib/api";
 import { downloadExcel } from "@/lib/excel";
+import { downloadReceiptPdf } from "@/lib/pdf";
 
 type Product = {
   id: number;
@@ -154,6 +157,8 @@ export default function ComandaPage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [whatsappNumber, setWhatsappNumber] = useState("");
+  const [whatsappError, setWhatsappError] = useState("");
 
   useEffect(() => {
     const token = sessionStorage.getItem("coffee_gosen_access_token");
@@ -262,10 +267,16 @@ export default function ComandaPage() {
     setSaving(true);
     try {
       const token = sessionStorage.getItem("coffee_gosen_access_token");
-      const received = paymentMethod === "CASH" ? Number(amountReceived) : null;
+      // Se comparan pesos enteros para que el pago exacto no falle por redondeo.
+      const saleTotal = Math.round(total);
+      const received = paymentMethod === "CASH" ? Math.round(Number(amountReceived)) : null;
+      if (paymentMethod === "CASH" && !amountReceived) {
+        setError("Escribe cuánto dinero te entregó el cliente.");
+        return;
+      }
       if (
         paymentMethod === "CASH" &&
-        (received === null || !Number.isFinite(received) || received < total)
+        (received === null || !Number.isFinite(received) || received < saleTotal)
       ) {
         setError("El dinero recibido debe ser igual o mayor que el total.");
         return;
@@ -306,6 +317,8 @@ export default function ComandaPage() {
         throw new Error(result.detail ?? "No fue posible confirmar la venta.");
       const saleResult = result as Receipt;
       setReceipt(saleResult);
+      setWhatsappNumber("");
+      setWhatsappError("");
       setCart([]);
       setBuyerName("");
       setCustomerId(null);
@@ -328,6 +341,60 @@ export default function ComandaPage() {
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  function sendReceiptByWhatsApp() {
+    if (!receipt) return;
+    let digits = whatsappNumber.replace(/\D/g, "");
+    if (digits.length === 10) digits = `57${digits}`;
+    if (digits.length < 11 || digits.length > 15) {
+      setWhatsappError("Escribe un número de celular válido, por ejemplo 300 123 4567.");
+      return;
+    }
+    const lines = [
+      "*Coffee Gosen* ☕",
+      "Comprobante de venta",
+      "",
+      `Venta: ${receipt.sale_number}`,
+      `Fecha: ${new Date(receipt.created_at).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" })}`,
+      `Cliente: ${receipt.customer_name ?? "Venta general"}`,
+      `Pago: ${paymentLabel[receipt.payment_method]}`,
+      "",
+      ...receipt.items.map((item) => `• ${formatComboQuantity(item.quantity)} x ${item.name} — ${money(Number(item.line_total))}`),
+      "",
+      ...(receipt.payment_method === "CASH" && receipt.amount_received !== null
+        ? [`Recibido: ${money(Number(receipt.amount_received))}`, `Vuelto: ${money(Number(receipt.change_amount))}`]
+        : []),
+      `*Total: ${money(Number(receipt.total))}*`,
+      "",
+      "¡Gracias por tu compra!",
+    ];
+    window.open(`https://wa.me/${digits}?text=${encodeURIComponent(lines.join("\n"))}`, "_blank", "noopener,noreferrer");
+  }
+
+  async function downloadReceipt() {
+    if (!receipt) return;
+    try {
+      await downloadReceiptPdf(
+        {
+          saleNumber: receipt.sale_number,
+          date: new Date(receipt.created_at).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }),
+          customer: receipt.customer_name ?? "Venta general",
+          payment: paymentLabel[receipt.payment_method],
+          items: receipt.items.map((item) => ({
+            name: item.name,
+            detail: `${formatComboQuantity(item.quantity)} x ${money(Number(item.unit_price))}`,
+            total: money(Number(item.line_total)),
+          })),
+          received: receipt.payment_method === "CASH" && receipt.amount_received !== null ? money(Number(receipt.amount_received)) : undefined,
+          change: receipt.payment_method === "CASH" && receipt.amount_received !== null ? money(Number(receipt.change_amount)) : undefined,
+          total: money(Number(receipt.total)),
+        },
+        `factura-${receipt.sale_number}.pdf`,
+      );
+    } catch {
+      setError("No fue posible generar la factura en PDF.");
     }
   }
 
@@ -616,27 +683,45 @@ export default function ComandaPage() {
               </div>
             </fieldset>
             {paymentMethod === "CASH" && (
-              <label className="mt-4 block text-sm font-semibold">
-                Dinero recibido
-                <input
-                  required
-                  min={total}
-                  step="1"
-                  inputMode="numeric"
-                  type="number"
-                  value={amountReceived}
-                  onChange={(event) =>
-                    setAmountReceived(event.target.value.replace(/[^0-9]/g, ""))
-                  }
-                  className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal"
-                  placeholder={String(total)}
-                />
-                <span className="mt-1 block text-xs font-normal text-[var(--muted)]">
-                  Vuelto: {amountReceived && Number(amountReceived) >= total
-                    ? money(Number(amountReceived) - total)
-                    : money(0)}
-                </span>
-              </label>
+              <div className="mt-4">
+                <label className="block text-sm font-semibold">
+                  Dinero recibido
+                  <span className="relative mt-2 block">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">$</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      value={amountReceived ? new Intl.NumberFormat("es-CO").format(Number(amountReceived)) : ""}
+                      onChange={(event) =>
+                        setAmountReceived(event.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, ""))
+                      }
+                      className="min-h-11 w-full border border-[var(--line)] pl-7 pr-3 font-normal"
+                      placeholder={new Intl.NumberFormat("es-CO").format(total)}
+                    />
+                  </span>
+                </label>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <button type="button" onClick={() => setAmountReceived(String(Math.round(total)))} disabled={total <= 0} className="choice !min-h-8 !px-2.5 !text-xs disabled:opacity-40">
+                    Exacto
+                  </button>
+                  {[5000, 10000, 20000, 50000, 100000]
+                    .filter((bill) => bill > total)
+                    .slice(0, 3)
+                    .map((bill) => (
+                      <button key={bill} type="button" onClick={() => setAmountReceived(String(bill))} className="choice !min-h-8 !px-2.5 !text-xs">
+                        {money(bill)}
+                      </button>
+                    ))}
+                </div>
+                <p className={`mt-2 text-sm font-semibold ${amountReceived && received < total ? "text-red-700" : "text-[var(--muted)]"}`}>
+                  {amountReceived && received < total
+                    ? `Faltan ${money(total - received)}`
+                    : amountReceived
+                      ? `Vuelto: ${money(received - total)}`
+                      : "Escribe cuánto te entregó el cliente."}
+                </p>
+              </div>
             )}
             {paymentMethod === "NEQUI" && (
               <label className="mt-4 block rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-950">
@@ -745,85 +830,145 @@ export default function ComandaPage() {
         </aside>
       </div>
       {receipt && (
-        <div className="fixed inset-0 z-40 grid place-items-center overflow-y-auto bg-[var(--ink)]/60 p-4">
-          <article className="pop w-full max-w-md">
-            <div className="rounded-t-[22px] bg-white p-7 shadow-2xl !rounded-b-none">
-              <div className="flex justify-end print:hidden">
-                <button
-                  aria-label="Cerrar factura"
-                  onClick={() => setReceipt(null)}
-                  className="grid size-9 place-items-center text-[var(--muted)] hover:bg-[var(--canvas)] hover:text-[var(--ink)]"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-              <div className="text-center">
-                <div className="brand-mark mx-auto size-14 rounded-2xl">
-                  <Check size={26} />
-                </div>
-                <h2 className="mt-4 text-2xl font-bold">Coffee Gosen</h2>
-                <p className="mt-1 text-xs text-[var(--muted)]">
-                  Comprobante de venta
+        <div className="receipt-overlay fixed inset-0 z-40 grid place-items-center overflow-y-auto bg-[var(--ink)]/60 p-4">
+          <article className="pop w-full max-w-md print:max-w-none">
+            <div className="flex justify-end pb-2 print:hidden">
+              <button
+                aria-label="Cerrar factura"
+                onClick={() => setReceipt(null)}
+                className="grid size-10 place-items-center !rounded-full bg-white/90 text-[var(--ink)] shadow-lg hover:bg-white"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="overflow-hidden rounded-t-[22px] bg-white shadow-2xl print:shadow-none">
+              <div className="relative overflow-hidden bg-[#2a130c] px-7 pb-6 pt-7 text-center text-[#fff6ea]">
+                <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-16 size-48 rounded-full border border-[#e9b872]/25" />
+                <div aria-hidden="true" className="pointer-events-none absolute -left-10 bottom-[-4.5rem] size-40 rounded-full border border-dashed border-[#e9b872]/25" />
+                <Image src="/Coffe.png" alt="Coffee Gosen" width={84} height={84} className="relative mx-auto rounded-full shadow-[0_0_0_3px_rgba(233,184,114,0.35)]" />
+                <p className="relative mt-3 text-xs text-[#e9b872]">Comprobante de venta</p>
+                <p className="relative mt-4 font-heading text-4xl font-bold tracking-tight">{money(receipt.total)}</p>
+                <p className="relative mt-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-semibold text-emerald-200">
+                  <Check size={13} /> Venta registrada
                 </p>
               </div>
-              <div className="mt-6 border-y border-dashed border-[var(--line)] py-4 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-[var(--muted)]">Venta</span>
-                  <strong>{receipt.sale_number}</strong>
+              <div className="px-7 pb-7 pt-6">
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                  <div>
+                    <dt className="text-xs text-[var(--muted)]">Venta</dt>
+                    <dd className="mt-0.5 break-all font-semibold">{receipt.sale_number}</dd>
+                  </div>
+                  <div className="text-right">
+                    <dt className="text-xs text-[var(--muted)]">Fecha</dt>
+                    <dd className="mt-0.5 font-semibold">
+                      {new Date(receipt.created_at).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" })}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-[var(--muted)]">Comprador</dt>
+                    <dd className="mt-0.5 font-semibold">{receipt.customer_name ?? "Venta general"}</dd>
+                  </div>
+                  <div className="text-right">
+                    <dt className="text-xs text-[var(--muted)]">Pago</dt>
+                    <dd className="mt-0.5 font-semibold">{paymentLabel[receipt.payment_method]}</dd>
+                  </div>
+                </dl>
+
+                <div className="mt-6 border-y border-dashed border-[var(--line)] py-3">
+                  {receipt.items.map((item) => (
+                    <div key={item.name} className="flex items-start justify-between gap-3 py-2 text-sm">
+                      <span className="min-w-0">
+                        <span className="block font-semibold">{item.name}</span>
+                        <span className="text-xs text-[var(--muted)]">
+                          {formatComboQuantity(item.quantity)} x {money(Number(item.unit_price))}
+                        </span>
+                      </span>
+                      <strong className="shrink-0">{money(Number(item.line_total))}</strong>
+                    </div>
+                  ))}
                 </div>
-                <div className="mt-2 flex justify-between">
-                  <span className="text-[var(--muted)]">Comprador</span>
-                  <span>{receipt.customer_name ?? "Venta general"}</span>
-                </div>
-                <div className="mt-2 flex justify-between">
-                  <span className="text-[var(--muted)]">Pago</span>
-                  <span>{paymentLabel[receipt.payment_method]}</span>
-                </div>
-                {receipt.payment_method === "CASH" &&
-                  receipt.amount_received !== null && (
+
+                <div className="space-y-1.5 pt-4 text-sm">
+                  {receipt.payment_method === "CASH" && receipt.amount_received !== null && (
                     <>
-                      <div className="mt-2 flex justify-between">
-                        <span className="text-[var(--muted)]">Recibido</span>
-                        <span>{money(receipt.amount_received)}</span>
+                      <div className="flex justify-between text-[var(--muted)]">
+                        <span>Recibido</span>
+                        <span>{money(Number(receipt.amount_received))}</span>
                       </div>
-                      <div className="mt-2 flex justify-between">
-                        <span className="text-[var(--muted)]">Vuelto</span>
-                        <span>{money(receipt.change_amount)}</span>
+                      <div className="flex justify-between text-[var(--muted)]">
+                        <span>Vuelto</span>
+                        <span>{money(Number(receipt.change_amount))}</span>
                       </div>
                     </>
                   )}
-              </div>
-              <div className="py-4">
-                {receipt.items.map((item) => (
-                  <div
-                    key={item.name}
-                    className="flex justify-between py-2 text-sm"
-                  >
-                    <span>
-                      {item.quantity} x {item.name}
-                    </span>
-                    <strong>{money(item.line_total)}</strong>
+                  <div className="flex items-end justify-between pt-2">
+                    <span className="font-semibold">Total</span>
+                    <span className="font-heading text-3xl font-bold tracking-tight">{money(receipt.total)}</span>
                   </div>
-                ))}
-              </div>
-              <div className="flex items-end justify-between border-t-2 border-[var(--ink)] pt-4">
-                <span className="font-semibold">Total</span>
-                <span className="font-heading text-3xl font-bold tracking-tight">{money(receipt.total)}</span>
-              </div>
-              <div className="print:hidden mt-6 grid gap-2 sm:grid-cols-2">
-                <button
-                  onClick={() => window.print()}
-                  className="inline-flex min-h-11 items-center justify-center gap-2 bg-[var(--blue-main)] font-semibold text-white"
+                </div>
+                <p className="mt-5 text-center text-xs text-[var(--muted)]">
+                  Gracias por tu compra · Coffee Gosen, un lugar de provisión, fe y sabor
+                </p>
+
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    sendReceiptByWhatsApp();
+                  }}
+                  className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 print:hidden"
                 >
-                  <Printer size={17} /> Imprimir factura
-                </button>
-                <button
-                  type="button"
-                  onClick={exportReceipt}
-                  className="inline-flex min-h-11 items-center justify-center gap-2 border border-[var(--line)] font-semibold text-[var(--blue-main)]"
-                >
-                  <Download size={17} /> Descargar Excel
-                </button>
+                  <label className="block text-sm font-semibold text-emerald-950">
+                    Enviar por WhatsApp
+                    <span className="mt-2 flex gap-2">
+                      <span className="relative flex-1">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-emerald-800">+57</span>
+                        <input
+                          type="tel"
+                          inputMode="tel"
+                          autoComplete="tel"
+                          value={whatsappNumber}
+                          onChange={(event) => {
+                            setWhatsappNumber(event.target.value.replace(/[^\d\s+]/g, ""));
+                            setWhatsappError("");
+                          }}
+                          placeholder="300 123 4567"
+                          className="min-h-11 w-full border border-emerald-200 bg-white pl-12 pr-3 font-normal"
+                        />
+                      </span>
+                      <button
+                        type="submit"
+                        className="inline-flex min-h-11 shrink-0 items-center gap-2 bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700"
+                      >
+                        <Send size={16} /> Enviar
+                      </button>
+                    </span>
+                  </label>
+                  {whatsappError && <p role="alert" className="mt-2 text-xs font-semibold text-red-700">{whatsappError}</p>}
+                </form>
+
+                <div className="mt-3 grid gap-2 sm:grid-cols-2 print:hidden">
+                  <button
+                    type="button"
+                    onClick={() => void downloadReceipt()}
+                    className="inline-flex min-h-12 items-center justify-center gap-2 bg-[var(--blue-main)] font-semibold text-white sm:col-span-2"
+                  >
+                    <FileDown size={18} /> Descargar factura
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="inline-flex min-h-11 items-center justify-center gap-2 border border-[var(--line)] font-semibold text-[var(--blue-main)]"
+                  >
+                    <Printer size={17} /> Imprimir factura
+                  </button>
+                  <button
+                    type="button"
+                    onClick={exportReceipt}
+                    className="inline-flex min-h-11 items-center justify-center gap-2 border border-[var(--line)] font-semibold text-[var(--blue-main)]"
+                  >
+                    <Download size={17} /> Descargar Excel
+                  </button>
+                </div>
               </div>
             </div>
             <div className="receipt-edge" aria-hidden="true" />

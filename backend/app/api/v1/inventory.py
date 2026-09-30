@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -121,12 +120,6 @@ def register_damage(
     if product.stock < payload.quantity:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Stock insuficiente para {product.name}")
 
-    category = database.scalar(select(ExpenseCategory).where(ExpenseCategory.name.ilike("Daño de inventario")).limit(1))
-    if category is None:
-        category = ExpenseCategory(name="Daño de inventario")
-        database.add(category)
-        database.flush()
-
     product.stock -= payload.quantity
     loss_amount = product.acquisition_cost * payload.quantity
     movement = InventoryMovement(
@@ -137,18 +130,19 @@ def register_damage(
         stock_after=product.stock,
         observation=payload.observation.strip(),
     )
-    database.add(movement)
-    database.add(FinancialMovement(
+    # Un daño no mueve dinero: se registra como costo (no gasto ni salida de caja).
+    cost_movement = FinancialMovement(
         user_id=current_user.id,
-        movement_type="EXPENSE",
+        movement_type="COST",
         amount=loss_amount,
         concept=f"Daño de {product.name}",
-        payment_method="CASH",
         product=product.name,
-        expense_category_id=category.id,
         observation=payload.observation.strip(),
-        settled_at=datetime.now(timezone.utc),
-    ))
+    )
+    database.add(cost_movement)
+    database.flush()
+    movement.financial_movement_id = cost_movement.id
+    database.add(movement)
     database.commit()
     database.refresh(product)
     return {
@@ -156,7 +150,7 @@ def register_damage(
         "product_id": product.id,
         "stock_after": float(product.stock),
         "movement_type": "DAMAGE",
-        "expense_amount": float(loss_amount),
+        "cost_amount": float(loss_amount),
     }
 
 

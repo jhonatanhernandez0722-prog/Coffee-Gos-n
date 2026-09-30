@@ -61,9 +61,9 @@ export default function PaymentQrPage() {
 
   return (
     <AdminPage title="QR de pago" description="Carga el código QR que usarán tus clientes para pagar por Nequi u otro medio digital.">
-      <section className="max-w-3xl border border-[var(--line)] bg-white p-6 sm:p-8">
+      <section className="max-w-4xl border border-[var(--line)] bg-white p-6 sm:p-8">
         <div className="flex items-start gap-4 border-b border-[var(--line)] pb-6">
-          <span className="grid size-12 shrink-0 place-items-center bg-[var(--blue-light)] text-[var(--blue-main)]">
+          <span className="brand-mark size-12 shrink-0">
             <QrCode size={26} />
           </span>
           <div>
@@ -74,7 +74,7 @@ export default function PaymentQrPage() {
 
         {error && <p role="alert" className="mt-6 border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</p>}
 
-        <div className="mt-6 grid gap-8 md:grid-cols-[minmax(0,1fr)_220px] md:items-center">
+        <div className="mt-6 grid gap-8 md:grid-cols-[minmax(0,1fr)_280px] md:items-center">
           <div>
             <label htmlFor="payment-qr" className="inline-flex min-h-11 cursor-pointer items-center gap-2 bg-[var(--blue-main)] px-4 text-sm font-semibold text-white outline-none transition hover:bg-[var(--blue-secondary)] focus-within:ring-2 focus-within:ring-[var(--blue-main)]">
               <Upload size={17} /> {qrImage ? "Reemplazar QR" : "Cargar QR"}
@@ -83,9 +83,9 @@ export default function PaymentQrPage() {
             <p className="mt-3 text-xs leading-5 text-[var(--muted)]">Formatos permitidos: PNG, JPG o WEBP. Tamaño máximo: 5 MB.</p>
             {qrImage && <button type="button" onClick={removeQr} className="mt-5 inline-flex min-h-10 items-center gap-2 border border-red-200 px-3 text-sm font-semibold text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300"><Trash2 size={16} /> Eliminar QR</button>}
           </div>
-          <div className="grid aspect-square place-items-center border border-dashed border-[var(--line)] bg-[var(--canvas)] p-4">
+          <div className="screen p-5"><p className="screen-label mb-3 text-center text-xs font-semibold">Vista para el cliente</p><div className="grid aspect-square place-items-center rounded-2xl bg-white p-4">
             {qrImage ? <Image src={qrImage} alt="Código QR de pago" width={320} height={320} unoptimized className="size-full object-contain" /> : <div className="text-center text-[var(--muted)]"><ImagePlus className="mx-auto" size={28} /><p className="mt-3 text-sm">Aún no hay un QR cargado.</p></div>}
-          </div>
+          </div></div>
         </div>
       </section>
     </AdminPage>

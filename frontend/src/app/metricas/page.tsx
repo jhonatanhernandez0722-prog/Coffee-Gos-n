@@ -48,14 +48,14 @@ function ChartFrame({
   return (
     <section className="border border-[var(--line)] bg-white p-5">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Icon size={19} className="text-[var(--blue-main)]" />
+        <div className="flex items-center gap-3">
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--blue-light)] text-[var(--blue-main)]"><Icon size={18} /></span>
           <div>
-            <h2 className="font-semibold">{title}</h2>
+            <h2 className="font-bold">{title}</h2>
             <p className="mt-1 text-xs text-[var(--muted)]">{description}</p>
           </div>
         </div>
-        <span className="border border-[var(--line)] px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--blue-main)]">
+        <span className="rounded-full border border-[var(--line)] px-2.5 py-1 text-xs font-semibold text-[var(--muted)]">
           {chartType}
         </span>
       </div>
@@ -75,7 +75,7 @@ function BarChart({
   const visible = points.slice(-14);
   const max = Math.max(...visible.map((point) => Number(point.value)), 1);
   return visible.length ? (
-    <div className="flex h-56 items-end gap-1 border-b border-l border-[var(--line)] px-3 pb-2 pt-4 sm:gap-2">
+    <div className="flex h-56 items-end gap-1 rounded-xl bg-[linear-gradient(to_top,var(--canvas),transparent)] px-3 pb-2 pt-4 sm:gap-2">
       {visible.map((point) => (
         <div
           key={point.label}
@@ -84,10 +84,10 @@ function BarChart({
         >
           <div className="relative flex h-full w-full items-end">
             <span
-              className="w-full rounded-t-sm transition-opacity group-hover:opacity-70"
+              className="w-full rounded-t-md transition-opacity group-hover:opacity-70"
               style={{
                 height: `${Math.max(4, (Number(point.value) / max) * 100)}%`,
-                backgroundColor: color,
+                background: `linear-gradient(to top, ${color}, color-mix(in oklab, ${color} 70%, white))`,
               }}
             />
           </div>
@@ -137,19 +137,19 @@ function LineChartView({ points }: { points: Point[] }) {
           y1={top}
           x2={left}
           y2={height - bottom}
-          stroke="#b7d7dc"
+          style={{ stroke: "var(--line)" }}
         />
         <line
           x1={left}
           y1={height - bottom}
           x2={width - left}
           y2={height - bottom}
-          stroke="#b7d7dc"
+          style={{ stroke: "var(--line)" }}
         />
-        <polygon points={areaPoints} fill="#4a8f64" opacity="0.12" />
+        <polygon points={areaPoints} style={{ fill: "var(--blue-main)" }} opacity="0.12" />
         <polyline
           fill="none"
-          stroke="#4a8f64"
+          style={{ stroke: "var(--blue-main)" }}
           strokeWidth="4"
           strokeLinejoin="round"
           strokeLinecap="round"
@@ -162,7 +162,7 @@ function LineChartView({ points }: { points: Point[] }) {
               cy={getY(Number(point.value))}
               r="5"
               fill="#fff"
-              stroke="#4a8f64"
+              style={{ stroke: "var(--blue-main)" }}
               strokeWidth="3"
             />
             <text
@@ -170,7 +170,7 @@ function LineChartView({ points }: { points: Point[] }) {
               y={height - 8}
               textAnchor="middle"
               fontSize="10"
-              fill="#4b6470"
+              style={{ fill: "var(--muted)" }}
             >
               {point.label}
             </text>
@@ -186,7 +186,7 @@ function LineChartView({ points }: { points: Point[] }) {
 }
 function DonutChart({ points }: { points: Point[] }) {
   const total = points.reduce((sum, point) => sum + Number(point.value), 0);
-  const colors = ["#087ea4", "#e5a63d", "#d65a42", "#4a8f64", "#7657a6"];
+  const colors = ["var(--blue-main)", "#e5a63d", "#d65a42", "#4a8f64", "#7657a6"];
   const offsets = points.map((_, index) =>
     points
       .slice(0, index)
@@ -221,7 +221,7 @@ function DonutChart({ points }: { points: Point[] }) {
                 cy="21"
                 r="15.9"
                 fill="none"
-                stroke={colors[index % colors.length]}
+                style={{ stroke: colors[index % colors.length] }}
                 strokeWidth="8"
                 strokeDasharray={`${length} ${100 - length}`}
                 strokeDashoffset={-offsets[index]}
@@ -239,7 +239,7 @@ function DonutChart({ points }: { points: Point[] }) {
           {points.map((point, index) => (
             <p key={point.label} className="flex items-center gap-2">
               <span
-                className="size-3 shrink-0"
+                className="size-3 shrink-0 rounded-full"
                 style={{ backgroundColor: colors[index % colors.length] }}
               />
               {point.label}
@@ -310,7 +310,7 @@ export default function MetricsPage() {
         const result = await response.json();
         if (!response.ok)
           throw new Error(
-            result.detail ?? "No fue posible cargar las m&eacute;tricas.",
+            result.detail ?? "No fue posible cargar las métricas.",
           );
         return result as Metrics;
       })
@@ -322,14 +322,6 @@ export default function MetricsPage() {
       title="M&eacute;tricas"
       description="Observa ingresos, egresos y ventas para tomar decisiones con datos."
     >
-      <button
-        type="button"
-        disabled={!data}
-        onClick={exportMetrics}
-        className="mb-4 inline-flex min-h-10 items-center gap-2 border border-[var(--line)] bg-white px-4 text-sm font-semibold text-[var(--blue-main)] disabled:opacity-50"
-      >
-        <Download size={16} /> Descargar Excel
-      </button>
       {error && (
         <p
           role="alert"
@@ -357,27 +349,35 @@ export default function MetricsPage() {
             className="mt-1 block min-h-10 border border-[var(--line)] px-3 text-sm font-normal"
           />
         </label>
+        {(dateFrom || dateTo) && (
+          <button type="button" onClick={() => { setDateFrom(""); setDateTo(""); }} className="choice !min-h-10">
+            Quitar filtro
+          </button>
+        )}
+        <button
+          type="button"
+          disabled={!data}
+          onClick={exportMetrics}
+          className="ml-auto inline-flex min-h-10 items-center gap-2 border border-[var(--line)] bg-white px-4 text-sm font-semibold text-[var(--blue-main)] disabled:opacity-50"
+        >
+          <Download size={16} /> Descargar Excel
+        </button>
       </div>
       {data && (
         <>
-          <div className="mb-6 grid gap-px border border-[var(--line)] bg-[var(--line)] sm:grid-cols-3">
-            <article className="bg-white p-5">
-              <p className="text-sm text-[var(--muted)]">Ingresos</p>
-              <strong className="mt-2 block text-2xl text-emerald-700">
-                {money(Number(data.total_income))}
-              </strong>
+          <div className="mb-6 grid gap-3 sm:grid-cols-3">
+            <article className="screen p-6">
+              <p className="screen-label flex items-center justify-between text-sm">Ingresos <TrendingUp size={18} /></p>
+              <strong className="screen-amount mt-4 block text-3xl">{money(Number(data.total_income))}</strong>
+              <p className="screen-label mt-2 text-xs">Balance del periodo: {money(Number(data.total_income) - Number(data.total_expenses))}</p>
             </article>
-            <article className="bg-white p-5">
-              <p className="text-sm text-[var(--muted)]">Egresos</p>
-              <strong className="mt-2 block text-2xl text-red-700">
-                {money(Number(data.total_expenses))}
-              </strong>
+            <article className="border border-[var(--line)] bg-white p-6">
+              <p className="flex items-center justify-between text-sm text-[var(--muted)]">Egresos <TrendingDown size={18} className="text-red-600" /></p>
+              <strong className="screen-amount mt-4 block text-3xl text-red-700">{money(Number(data.total_expenses))}</strong>
             </article>
-            <article className="bg-white p-5">
-              <p className="text-sm text-[var(--muted)]">Ventas</p>
-              <strong className="mt-2 block text-2xl">
-                {data.total_sales}
-              </strong>
+            <article className="border border-[var(--line)] bg-white p-6">
+              <p className="flex items-center justify-between text-sm text-[var(--muted)]">Ventas <BarChart3 size={18} className="text-[var(--blue-main)]" /></p>
+              <strong className="screen-amount mt-4 block text-3xl">{data.total_sales}</strong>
             </article>
           </div>
           <div className="grid gap-6 lg:grid-cols-2">
@@ -389,7 +389,7 @@ export default function MetricsPage() {
             >
               <BarChart
                 points={data.income_by_day}
-                color="#087ea4"
+                color="var(--blue-main)"
                 formatValue={money}
               />
             </ChartFrame>

@@ -117,6 +117,7 @@ def list_movements(
                 product_name=product_name,
                 seller_name=seller_name,
                 customer_name=customer_name,
+                payment_method=sale_detail.get("payment_method"),
                 source_combo_product_id=movement.source_combo_product_id,
                 created_at=movement.created_at,
             )
@@ -139,6 +140,7 @@ def list_movements(
                 product_name=None,
                 seller_name=sale_detail.get("seller_name"),
                 customer_name=sale_detail.get("customer_name"),
+                payment_method=movement.payment_method or sale_detail.get("payment_method"),
                 created_at=movement.created_at,
             )
         )
@@ -212,17 +214,18 @@ def update_inventory_movement(
     movement.quantity = quantity
     movement.stock_after = new_product.stock
 
+    financial_prefix = "Daño de" if movement.movement_type == "DAMAGE" else "Compra de"
     if financial_movement:
         unit_cost = payload.unit_cost if payload.unit_cost is not None else current_unit_cost
         financial_movement.amount = quantity * unit_cost
-        financial_movement.concept = f"Compra de {new_product.name}"
+        financial_movement.concept = f"{financial_prefix} {new_product.name}"
         financial_movement.product = new_product.name
-        financial_movement.observation = movement.observation or f"Compra de {new_product.name}"
+        financial_movement.observation = movement.observation or f"{financial_prefix} {new_product.name}"
 
     if payload.observation is not None:
         movement.observation = payload.observation.strip() or None
         if financial_movement:
-            financial_movement.observation = movement.observation or f"Compra de {new_product.name}"
+            financial_movement.observation = movement.observation or f"{financial_prefix} {new_product.name}"
 
     if payload.assigned_seller_id is not None:
         seller = database.scalar(select(User).where(User.id == payload.assigned_seller_id, User.role == "SELLER", User.is_active.is_(True)))
@@ -347,7 +350,10 @@ def delete_movement(
             if linked_inventory is not None:
                 product = database.scalar(select(Product).where(Product.id == linked_inventory.product_id).with_for_update())
                 if product is not None:
-                    product.stock -= linked_inventory.quantity
+                    if linked_inventory.movement_type in {"PURCHASE", "ADJUSTMENT"}:
+                        product.stock -= linked_inventory.quantity
+                    else:
+                        product.stock += linked_inventory.quantity
                     if product.stock < 0:
                         raise HTTPException(status_code=400, detail="No se puede eliminar: el stock resultante sería negativo")
                 database.delete(linked_inventory)

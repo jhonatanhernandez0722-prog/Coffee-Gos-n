@@ -18,10 +18,16 @@ class CreditRow(BaseModel):
     created_at: datetime
     support_urls: list[str] = []
     products: list["CreditProduct"] = []
+    payments: list["CreditPayment"] = []
 
 class CreditProduct(BaseModel):
     name: str
     quantity: Decimal
+
+class CreditPayment(BaseModel):
+    amount: Decimal
+    payment_method: str | None
+    created_at: datetime
 
 class CreditsResponse(BaseModel):
     credits: list[CreditRow]

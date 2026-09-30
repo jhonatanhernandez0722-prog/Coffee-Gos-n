@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { ArrowLeft, BarChart3, ChevronDown, CircleDollarSign, Coffee, CreditCard, HandCoins, LayoutDashboard, Package, Palette, QrCode, ReceiptText, Scale, ShoppingBag, UserRound, Users, Volume2, WalletCards } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { ArrowLeft, BarChart3, CircleDollarSign, Coffee, CreditCard, HandCoins, LayoutDashboard, LogOut, Menu, Package, Palette, QrCode, ReceiptText, Scale, ShoppingBag, UserRound, Users, Volume2, WalletCards } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { apiUrl } from "@/lib/api";
+import { NavDrawer } from "@/components/nav-drawer";
 
 type RouteItem = { key: string; label: string; href: string; icon: LucideIcon };
 const accessByRoute: Record<string, RouteItem> = {
@@ -33,8 +34,9 @@ export function AdminPage({ title, description, children }: { title: string; des
   const router = useRouter();
   const [accessChecked, setAccessChecked] = useState(false);
   const [homeRoute, setHomeRoute] = useState("/dashboard");
-  const [currentUser, setCurrentUser] = useState<{ role?: string; permissions?: string[] } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ role?: string; permissions?: string[]; full_name?: string } | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
   const isAdminUser = currentUser?.role === "ADMIN";
   const visibleNavigation = navigation.filter((item) => {
     if (!currentUser || isAdminUser) return true;
@@ -53,7 +55,7 @@ export function AdminPage({ title, description, children }: { title: string; des
         return;
       }
 
-      let user = JSON.parse(storedUser) as { role?: string; permissions?: string[] };
+      let user = JSON.parse(storedUser) as { role?: string; permissions?: string[]; full_name?: string };
       setCurrentUser(user);
       const token = sessionStorage.getItem("coffee_gosen_access_token");
 
@@ -83,7 +85,7 @@ export function AdminPage({ title, description, children }: { title: string; des
         }
 
         if (response.ok) {
-          user = await response.json() as { role?: string; permissions?: string[] };
+          user = await response.json() as { role?: string; permissions?: string[]; full_name?: string };
           setCurrentUser(user);
           sessionStorage.setItem("coffee_gosen_user", JSON.stringify(user));
         }
@@ -115,66 +117,65 @@ export function AdminPage({ title, description, children }: { title: string; des
 
   const CurrentIcon = accessByRoute[pathname]?.icon ?? LayoutDashboard;
   if (!accessChecked) return <main className="grid min-h-screen place-items-center text-sm text-[var(--muted)]"><span className="flex items-center gap-3"><span className="brand-mark size-9 animate-pulse"><Coffee size={17} /></span>Comprobando permisos...</span></main>;
+  const userName = currentUser?.full_name ?? "";
   return (
-    <main className="min-h-screen">
-      <header className="chrome sticky top-0 z-30 border-b print:hidden">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3.5 sm:px-6 lg:px-8">
-          <Link href="/dashboard" className="flex items-center gap-3 font-heading text-lg font-bold tracking-tight text-white"><span className="brand-mark size-10"><Coffee size={18} /></span>Coffee Gosen</Link>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <button type="button" onClick={() => setMenuOpen((prev) => !prev)} aria-expanded={menuOpen} className="chrome-btn">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
-                <span className="hidden sm:inline">Menú</span>
-              </button>
-              {menuOpen && (
-                <div className="reveal absolute right-0 z-40 mt-3 w-[min(20rem,calc(100vw-2rem))] rounded-2xl border border-[var(--line)] bg-white p-2 text-[var(--ink)] shadow-2xl">
-                  <div className="mb-2 flex items-center justify-between px-2 py-1">
-                    <strong className="text-sm text-[var(--ink)]">Navegación</strong>
-                    <button type="button" onClick={() => setMenuOpen(false)} className="px-2 py-1 text-xs text-[var(--muted)] hover:text-[var(--ink)]">Cerrar</button>
-                  </div>
-                  <nav className="grid max-h-[70vh] gap-1 overflow-y-auto">
-                    {visibleNavigation.map(({ href, label, icon: Icon }) => (
-                      <Link key={href} href={href} onClick={() => setMenuOpen(false)} className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${pathname === href ? "bg-[var(--blue-light)] text-[var(--blue-main)]" : "text-[var(--muted)] hover:bg-[var(--canvas)] hover:text-[var(--ink)]"}`}><span className={`grid size-8 place-items-center rounded-lg ${pathname === href ? "bg-[var(--blue-main)] text-white" : "bg-[var(--canvas)] text-[var(--blue-main)]"}`}><Icon size={15} /></span>{label}</Link>
-                    ))}
-                  </nav>
-                </div>
-              )}
-            </div>
-            <Link href={homeRoute} className="chrome-btn"><ArrowLeft size={16} /> Volver</Link>
-          </div>
-        </div>
-        <nav className="no-scrollbar mx-auto hidden max-w-7xl gap-1 overflow-x-auto px-4 pb-3 sm:px-6 lg:flex lg:px-8" aria-label="Secciones">
+    <main className="min-h-screen lg:grid lg:grid-cols-[264px_1fr]">
+      <aside className="chrome no-scrollbar hidden border-r p-5 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:overflow-y-auto print:hidden">
+        <Link href="/dashboard" className="mb-10 flex items-center gap-3 px-1 font-heading text-lg font-bold tracking-tight text-white"><span className="brand-mark size-10"><Coffee size={18} /></span>Coffee Gosen</Link>
+        <p className="mb-3 px-3 text-xs font-semibold opacity-70">Operación</p>
+        <nav className="space-y-1" aria-label="Secciones">
           {visibleNavigation.map(({ href, label, icon: Icon }) => (
-            <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined} className="nav-pill">
-              <Icon size={16} />
+            <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined} className="nav-pill w-full">
+              <Icon size={18} />
               {label}
             </Link>
           ))}
         </nav>
-      </header>
-
-      <details className="group border-b border-[var(--line)] bg-white/80 px-4 py-3 backdrop-blur sm:px-6 lg:hidden print:hidden">
-        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--ink)] shadow-sm transition-colors hover:border-[var(--blue-main)] [&::-webkit-details-marker]:hidden">
-          <span className="flex items-center gap-3"><span className="brand-mark size-9"><CurrentIcon size={16} /></span>{accessByRoute[pathname]?.label ?? "Ir a sección"}</span>
-          <ChevronDown aria-hidden="true" size={19} className="text-[var(--muted)] transition-transform group-open:rotate-180" />
-        </summary>
-        <nav className="mt-2 grid gap-1 rounded-2xl border border-[var(--line)] bg-[var(--canvas)] p-2 sm:grid-cols-2" aria-label="Navegación de secciones">
-          {visibleNavigation.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`flex min-h-12 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${pathname === href ? "bg-[var(--blue-light)] text-[var(--blue-main)]" : "text-[var(--muted)] hover:bg-white hover:text-[var(--ink)]"}`}><Icon size={17} />{label}</Link>)}
-        </nav>
-      </details>
-
-      <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
-        <div className="reveal flex items-start gap-5">
-          <span className="brand-mark hidden size-14 shrink-0 rounded-2xl sm:grid"><CurrentIcon size={24} /></span>
+        <div className="mt-auto flex items-center gap-3 rounded-2xl border border-[var(--chrome-line)] bg-white/5 p-3">
+          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--blue-light)] font-heading text-sm font-bold text-[var(--chrome)]">{(userName || "S").charAt(0).toUpperCase()}</span>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-[var(--blue-main)]">Operación</p>
-            <h1 className="page-title mt-2">{title}</h1>
-            <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)]">{description}</p>
-            <div className="page-title-rule mt-6" aria-hidden="true" />
+            <p className="truncate text-sm font-semibold text-white">{userName || "Sesión de prueba"}</p>
+            <p className="text-xs opacity-70">{userName ? "Usuario autenticado" : "Sin autenticación"}</p>
           </div>
         </div>
-        <div className="mt-10">{children}</div>
-      </section>
+      </aside>
+
+      <div className="min-w-0">
+        <header className="chrome sticky top-0 z-30 border-b lg:hidden print:hidden">
+          <div className="flex items-center justify-between gap-4 px-4 py-3.5 sm:px-6">
+            <Link href="/dashboard" className="flex items-center gap-3 font-heading text-lg font-bold tracking-tight text-white"><span className="brand-mark size-10"><Coffee size={18} /></span>Coffee Gosen</Link>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setMenuOpen(true)} aria-expanded={menuOpen} className="chrome-btn">
+                <Menu size={17} />
+                <span className="hidden sm:inline">Menú</span>
+              </button>
+              <Link href={homeRoute} className="chrome-btn"><ArrowLeft size={16} /><span className="hidden sm:inline">Volver</span></Link>
+            </div>
+          </div>
+        </header>
+        <header className="sticky top-0 z-30 hidden min-h-[64px] items-center justify-between lg:flex print:hidden border-b border-[var(--line)] bg-white/75 px-10 backdrop-blur-xl">
+            <p className="flex items-center gap-2 text-sm font-semibold text-[var(--muted)]"><CurrentIcon size={16} className="text-[var(--blue-main)]" />{accessByRoute[pathname]?.label ?? title}</p>
+            <div className="flex items-center gap-1 rounded-2xl border border-[var(--line)] bg-white/90 p-1 shadow-sm">
+              <Link href={homeRoute} className="inline-flex h-10 items-center gap-2 px-3 text-sm font-semibold text-[var(--muted)] transition hover:bg-[var(--canvas)] hover:text-[var(--ink)]"><ArrowLeft size={16} /> Volver</Link>
+              <span className="mx-0.5 h-6 w-px bg-[var(--line)]" aria-hidden="true" />
+              <Link href="/" aria-label="Cerrar sesión" onClick={() => { sessionStorage.removeItem("coffee_gosen_access_token"); sessionStorage.removeItem("coffee_gosen_user"); window.dispatchEvent(new Event("coffee-gosen-auth")); }} className="inline-flex h-10 items-center gap-2 px-3 text-sm font-semibold text-[var(--muted)] transition hover:bg-red-50 hover:text-red-700"><LogOut size={16} /> Salir</Link>
+            </div>
+        </header>
+        <NavDrawer items={visibleNavigation} activeHref={pathname} open={menuOpen} onClose={closeMenu} />
+
+        <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-10 lg:py-12">
+          <div className="reveal flex items-start gap-5">
+            <span className="brand-mark hidden size-14 shrink-0 rounded-2xl sm:grid"><CurrentIcon size={24} /></span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[var(--blue-main)]">Operación</p>
+              <h1 className="page-title mt-2">{title}</h1>
+              <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)]">{description}</p>
+              <div className="page-title-rule mt-6" aria-hidden="true" />
+            </div>
+          </div>
+          <div className="mt-10">{children}</div>
+        </section>
+      </div>
     </main>
   );
 }

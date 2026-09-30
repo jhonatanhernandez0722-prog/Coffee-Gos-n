@@ -1,12 +1,13 @@
 "use client";
 
 import { type FormEvent, useEffect, useState } from "react";
-import { CreditCard, Download, HandCoins, Trash2, X } from "lucide-react";
+import { CreditCard, Download, HandCoins, Search, Trash2, X } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
 import { apiUrl, userFacingError } from "@/lib/api";
 import { downloadExcel } from "@/lib/excel";
 
 type CreditProduct = { name: string; quantity: number };
+type CreditPayment = { amount: number; payment_method: "CASH" | "NEQUI" | null; created_at: string };
 type Credit = {
   id: number;
   sale_number: string;
@@ -18,8 +19,11 @@ type Credit = {
   status: string;
   created_at: string;
   products: CreditProduct[];
+  payments: CreditPayment[];
   support_urls: string[];
 };
+const paymentLabels: Record<string, string> = { CASH: "Efectivo", NEQUI: "Transferencia (Nequi)" };
+const statusLabels: Record<string, string> = { PENDING: "Pendiente", PAID: "Pagado" };
 
 const money = (value: number) =>
   new Intl.NumberFormat("es-CO", {
@@ -39,6 +43,7 @@ export default function CreditsPage() {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "NEQUI">("CASH");
   const [paymentSaving, setPaymentSaving] = useState(false);
+  const [customerFilter, setCustomerFilter] = useState("");
   const [isAdmin] = useState(() => {
     if (typeof window === "undefined") return false;
     const storedUser = sessionStorage.getItem("coffee_gosen_user");
@@ -133,9 +138,12 @@ export default function CreditsPage() {
     }
   }
 
+  const normalize = (value: string) => value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const visibleCredits = credits.filter((credit) => normalize(credit.customer_name).includes(normalize(customerFilter.trim())));
+
   function exportCredits() {
     downloadExcel(
-      credits.map((credit) => ({
+      visibleCredits.map((credit) => ({
         Venta: credit.sale_number,
         Fecha: credit.created_at,
         Cliente: credit.customer_name,
@@ -144,9 +152,14 @@ export default function CreditsPage() {
           .join(", "),
         Vendedor: credit.seller_name ?? "Sin asignar",
         Registró: credit.cashier_name ?? "",
-        Original: credit.original_amount,
-        Pendiente: credit.pending_amount,
-        Estado: credit.status,
+        Original: Number(credit.original_amount),
+        Pendiente: Number(credit.pending_amount),
+        Pagado: credit.payments.reduce((sum, payment) => sum + Number(payment.amount), 0),
+        "Medio de pago": [...new Set(credit.payments.map((payment) => paymentLabels[payment.payment_method ?? ""] ?? "Sin dato"))].join(", ") || "Sin pagos",
+        Pagos: credit.payments
+          .map((payment) => `${new Date(payment.created_at).toLocaleDateString("es-CO")} ${paymentLabels[payment.payment_method ?? ""] ?? "Sin dato"} ${money(Number(payment.amount))}`)
+          .join(" | "),
+        Estado: statusLabels[credit.status] ?? credit.status,
         Soportes: credit.support_urls.length,
       })),
       "creditos.xlsx",
@@ -159,13 +172,44 @@ export default function CreditsPage() {
       title="Créditos"
       description="Consulta las ventas a crédito y el saldo pendiente de cada comprador."
     >
-      <button
-        type="button"
-        onClick={exportCredits}
-        className="mb-4 inline-flex min-h-10 items-center gap-2 border border-[var(--line)] bg-white px-4 text-sm font-semibold text-[var(--blue-main)]"
-      >
-        <Download size={16} /> Descargar Excel
-      </button>
+      <div className="mb-6 grid gap-3 sm:grid-cols-3">
+        <article className="screen p-6">
+          <p className="screen-label text-sm">Cartera pendiente</p>
+          <strong className="screen-amount mt-4 block text-3xl">{money(credits.filter((credit) => credit.status === "PENDING").reduce((sum, credit) => sum + Number(credit.pending_amount), 0))}</strong>
+        </article>
+        <article className="border border-[var(--line)] bg-white p-6">
+          <p className="text-sm text-[var(--muted)]">Créditos pendientes</p>
+          <strong className="screen-amount mt-4 block text-3xl text-amber-700">{credits.filter((credit) => credit.status === "PENDING").length}</strong>
+        </article>
+        <article className="border border-[var(--line)] bg-white p-6">
+          <p className="text-sm text-[var(--muted)]">Créditos pagados</p>
+          <strong className="screen-amount mt-4 block text-3xl text-emerald-700">{credits.filter((credit) => credit.status === "PAID").length}</strong>
+        </article>
+      </div>
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <label className="relative block w-full max-w-sm">
+          <span className="sr-only">Filtrar por cliente</span>
+          <Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
+          <input
+            value={customerFilter}
+            onChange={(event) => setCustomerFilter(event.target.value)}
+            placeholder="Filtrar por nombre del cliente"
+            className="min-h-11 w-full border border-[var(--line)] pl-10 pr-10 text-sm"
+          />
+          {customerFilter && (
+            <button type="button" aria-label="Limpiar filtro" onClick={() => setCustomerFilter("")} className="absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center text-[var(--muted)] hover:text-[var(--ink)]">
+              <X size={15} />
+            </button>
+          )}
+        </label>
+        <button
+          type="button"
+          onClick={exportCredits}
+          className="inline-flex min-h-11 items-center gap-2 border border-[var(--line)] bg-white px-4 text-sm font-semibold text-[var(--blue-main)]"
+        >
+          <Download size={16} /> Descargar Excel
+        </button>
+      </div>
       {error && (
         <p
           role="alert"
@@ -177,11 +221,11 @@ export default function CreditsPage() {
       <section className="border border-[var(--line)] bg-white">
         <div className="border-b border-[var(--line)] p-5">
           <div className="flex items-center gap-3">
-            <CreditCard className="text-[var(--blue-main)]" size={22} />
+            <span className="grid size-11 place-items-center rounded-xl bg-[var(--blue-light)] text-[var(--blue-main)]"><CreditCard size={20} /></span>
             <div>
-              <h2 className="font-semibold">Créditos registrados</h2>
+              <h2 className="text-lg font-bold">Créditos registrados</h2>
               <p className="mt-1 text-sm text-[var(--muted)]">
-                {credits.length} créditos encontrados
+                {customerFilter ? `${visibleCredits.length} de ${credits.length} créditos para “${customerFilter.trim()}”` : `${credits.length} créditos encontrados`}
               </p>
             </div>
           </div>
@@ -190,9 +234,13 @@ export default function CreditsPage() {
           <div className="p-10 text-center text-sm text-[var(--muted)]">
             Todavía no hay ventas registradas a crédito.
           </div>
+        ) : visibleCredits.length === 0 ? (
+          <div className="p-10 text-center text-sm text-[var(--muted)]">
+            Ningún crédito coincide con “{customerFilter.trim()}”.
+          </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1220px] text-left text-sm">
+            <table className="w-full min-w-[1400px] text-left text-sm">
               <thead className="border-b border-[var(--line)] text-[var(--muted)]">
                 <tr>
                   <th className="p-4 font-medium">Venta / fecha</th>
@@ -201,12 +249,13 @@ export default function CreditsPage() {
                   <th className="p-4 font-medium">Vendedor</th>
                   <th className="p-4 font-medium">Registró</th>
                   <th className="p-4 font-medium">Saldo</th>
+                  <th className="p-4 font-medium">Pagos / medio de pago</th>
                   <th className="p-4 font-medium">Soportes</th>
                   <th className="p-4 font-medium">Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {credits.map((credit) => (
+                {visibleCredits.map((credit) => (
                   <tr
                     key={credit.id}
                     className="border-b border-[var(--line)] last:border-0"
@@ -217,8 +266,14 @@ export default function CreditsPage() {
                         {new Date(credit.created_at).toLocaleString("es-CO")}
                       </span>
                     </td>
-                    <td className="p-4 font-semibold">
-                      {credit.customer_name}
+                    <td className="p-4">
+                      <span className="flex items-center gap-2 font-semibold">
+                        <span className="brand-mark size-8 shrink-0 text-xs font-bold">{credit.customer_name.charAt(0).toUpperCase()}</span>
+                        {credit.customer_name}
+                      </span>
+                      <span className={`mt-1.5 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${credit.status === "PENDING" ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-700"}`}>
+                        {statusLabels[credit.status] ?? credit.status}
+                      </span>
                     </td>
                     <td className="p-4">
                       <ul className="space-y-1">
@@ -245,6 +300,25 @@ export default function CreditsPage() {
                       <span className="mt-1 block text-xs text-[var(--muted)]">
                         Original: {money(Number(credit.original_amount))}
                       </span>
+                    </td>
+                    <td className="p-4">
+                      {credit.payments.length ? (
+                        <ul className="space-y-1.5">
+                          {credit.payments.map((payment, index) => (
+                            <li key={`${credit.id}-${index}`} className="flex flex-wrap items-center gap-2">
+                              <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${payment.payment_method === "NEQUI" ? "border-violet-200 bg-violet-50 text-violet-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
+                                {paymentLabels[payment.payment_method ?? ""] ?? "Sin dato"}
+                              </span>
+                              <strong>{money(Number(payment.amount))}</strong>
+                              <span className="text-xs text-[var(--muted)]">
+                                {new Date(payment.created_at).toLocaleDateString("es-CO")}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <span className="text-xs text-[var(--muted)]">Sin pagos</span>
+                      )}
                     </td>
                     <td className="p-4">
                       {credit.support_urls.length
