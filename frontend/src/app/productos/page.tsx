@@ -113,6 +113,8 @@ export default function ProductsPage() {
   const [damageTarget, setDamageTarget] = useState<Product | null>(null);
   const [damageQuantity, setDamageQuantity] = useState("1");
   const [damageObservation, setDamageObservation] = useState("Producto dañado");
+  const [damageCost, setDamageCost] = useState("");
+  const [damageError, setDamageError] = useState("");
   const [purchaseTarget, setPurchaseTarget] = useState<Product | null>(null);
   const [purchaseQuantity, setPurchaseQuantity] = useState("1");
   const [purchaseCost, setPurchaseCost] = useState("0");
@@ -598,7 +600,8 @@ export default function ProductsPage() {
     setDamageTarget(product);
     setDamageQuantity("1");
     setDamageObservation("Producto dañado");
-    setError("");
+    setDamageCost(Number(product.acquisition_cost) > 0 ? String(Number(product.acquisition_cost)) : "");
+    setDamageError("");
   }
 
   async function reportDamage(event: FormEvent<HTMLFormElement>) {
@@ -606,27 +609,33 @@ export default function ProductsPage() {
     if (!damageTarget) return;
     const quantity = Number(damageQuantity);
     if (!Number.isFinite(quantity) || quantity <= 0 || quantity > Number(damageTarget.stock)) {
-      setError("La cantidad debe ser mayor a cero y no superar el stock disponible.");
+      setDamageError("La cantidad debe ser mayor a cero y no superar el stock disponible.");
+      return;
+    }
+    const unitCost = Number(damageCost);
+    if (!Number.isFinite(unitCost) || unitCost <= 0) {
+      setDamageError("Indica el costo unitario del producto dañado.");
       return;
     }
     if (damageObservation.trim().length < 2) {
-      setError("Escribe el motivo del daño.");
+      setDamageError("Escribe el motivo del daño.");
       return;
     }
+    setDamageError("");
     setSaving(true);
     try {
       const token = sessionStorage.getItem("coffee_gosen_access_token");
       const response = await fetch(`${apiUrl}/inventory/damage`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ product_id: damageTarget.id, quantity, observation: damageObservation.trim() }),
+        body: JSON.stringify({ product_id: damageTarget.id, quantity, unit_cost: unitCost, observation: damageObservation.trim() }),
       });
-      const result = await response.json();
+      const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(apiError(result, "No fue posible reportar el daño."));
-      setProducts((current) => current.map((item) => item.id === damageTarget.id ? { ...item, stock: Number(result.stock_after) } : item));
       setDamageTarget(null);
+      await loadCatalog().catch(() => undefined);
     } catch (requestError) {
-      setError(userFacingError(requestError, "No fue posible reportar el daño."));
+      setDamageError(userFacingError(requestError, "No fue posible reportar el daño."));
     } finally {
       setSaving(false);
     }
@@ -1214,7 +1223,12 @@ export default function ProductsPage() {
               Motivo del daño
               <textarea required minLength={2} maxLength={500} value={damageObservation} onChange={(event) => setDamageObservation(event.target.value)} rows={3} className="mt-2 w-full border border-[var(--line)] px-3 py-2 font-normal" />
             </label>
-            <p className="mt-3 text-xs leading-5 text-[var(--muted)]">Se descontará el stock y se registrará un egreso por el costo de adquisición del producto.</p>
+            <label className="mt-4 block text-sm font-semibold">
+              Costo unitario
+              <input required min="1" step="any" type="number" value={damageCost} onChange={(event) => setDamageCost(event.target.value)} className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal" />
+            </label>
+            <p className="mt-3 text-xs leading-5 text-[var(--muted)]">Se descontará el stock y se registrará una pérdida de <strong>{money((Number(damageQuantity) || 0) * (Number(damageCost) || 0))}</strong> como costo (no sale de caja).</p>
+            {damageError && <p role="alert" className="mt-3 border border-red-200 bg-red-50 p-3 text-sm text-red-700">{damageError}</p>}
 
             <div className="mt-6 flex justify-end gap-3">
               <button type="button" onClick={() => setDamageTarget(null)} className="min-h-11 border border-[var(--line)] px-4 text-sm font-semibold">Cancelar</button>

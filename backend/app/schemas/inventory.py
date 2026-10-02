@@ -22,6 +22,7 @@ class InternalUseCreate(BaseModel):
 class DamageCreate(BaseModel):
     product_id: int = Field(gt=0)
     quantity: Decimal = Field(gt=0, decimal_places=3)
+    unit_cost: Decimal | None = Field(default=None, gt=0)
     observation: str = Field(min_length=2, max_length=500)
 
 

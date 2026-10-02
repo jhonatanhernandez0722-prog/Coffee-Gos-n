@@ -49,6 +49,7 @@ type DashboardSummary = {
   previous_income_total: number;
   expenses_today: number;
   cost_today: number;
+  damage_cost_today?: number;
   profit_today: number;
   sales_today: number;
   products_sold_today: number;
@@ -105,6 +106,7 @@ type MonthlyProduct = {
   cost_total: number;
   profit_total: number;
   unit_price: number;
+  damage_total?: number;
 };
 type MonthlyReport = {
   month: string;
@@ -412,7 +414,7 @@ export default function DashboardPage() {
         {
           label: "Ingresos de hoy",
           value: formatCurrency(summary.income_today),
-          detail: `Costos ${formatCurrency(summary.cost_today)}`,
+          detail: `Costos ${formatCurrency(summary.cost_today)}${Number(summary.damage_cost_today) > 0 ? ` (daños ${formatCurrency(Number(summary.damage_cost_today))})` : ""}`,
           icon: CircleDollarSign,
         },
         {
@@ -822,8 +824,8 @@ export default function DashboardPage() {
                             <td className="p-3">{formatUnits(Number(product.units_sold))}</td>
                             <td className="p-3">{formatCurrency(product.unit_price)}</td>
                             <td className="p-3">{formatCurrency(product.sales_total)}</td>
-                            <td className="p-3">{formatCurrency(product.cost_total)}</td>
-                            <td className="p-3 font-semibold text-emerald-700">{formatCurrency(product.profit_total)}</td>
+                            <td className="p-3">{formatCurrency(product.cost_total)}{Number(product.damage_total) > 0 && <span className="block text-xs text-red-700">Incluye daño {formatCurrency(Number(product.damage_total))}</span>}</td>
+                            <td className={`p-3 font-semibold ${product.profit_total < 0 ? "text-red-700" : "text-emerald-700"}`}>{formatCurrency(product.profit_total)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -977,8 +979,9 @@ export default function DashboardPage() {
                                 </td>
                                 <td className="p-3">
                                   {formatCurrency(product.cost_total)}
+                                  {Number(product.damage_total) > 0 && <span className="block text-xs text-red-700">Incluye daño {formatCurrency(Number(product.damage_total))}</span>}
                                 </td>
-                                <td className="p-3 font-semibold text-emerald-700">
+                                <td className={`p-3 font-semibold ${product.profit_total < 0 ? "text-red-700" : "text-emerald-700"}`}>
                                   {formatCurrency(product.profit_total)}
                                 </td>
                               </tr>

@@ -10,6 +10,7 @@ class MonthlyProductRow(BaseModel):
     cost_total: Decimal
     profit_total: Decimal
     unit_price: Decimal
+    damage_total: Decimal = Decimal("0")
 
 
 class DashboardSummary(BaseModel):
@@ -23,6 +24,7 @@ class DashboardSummary(BaseModel):
     previous_income_total: Decimal
     expenses_today: Decimal
     cost_today: Decimal
+    damage_cost_today: Decimal = Decimal("0")
     profit_today: Decimal
     sales_today: int
     products_sold_today: int
@@ -41,4 +43,5 @@ class MonthlyReport(BaseModel):
     total_income: Decimal
     total_expenses: Decimal
     total_sales: int
+    total_damage_costs: Decimal = Decimal("0")
     products: list[MonthlyProductRow]

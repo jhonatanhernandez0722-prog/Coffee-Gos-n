@@ -19,6 +19,28 @@ def format_quantity(value: Decimal) -> str:
     return format(value.normalize(), "f")
 
 
+def damage_costs_by_product(database: Session, start: datetime, end: datetime) -> dict[str, Decimal]:
+    rows = database.execute(
+        select(func.coalesce(FinancialMovement.product, FinancialMovement.concept), func.sum(FinancialMovement.amount))
+        .where(FinancialMovement.movement_type == "COST", FinancialMovement.created_at >= start, FinancialMovement.created_at < end)
+        .group_by(func.coalesce(FinancialMovement.product, FinancialMovement.concept))
+    ).all()
+    return {name: total or Decimal("0") for name, total in rows}
+
+
+def product_rows_with_damage(products: list, damages: dict[str, Decimal]) -> list[MonthlyProductRow]:
+    # Las pérdidas por daño suman al costo del producto y restan de su ganancia.
+    rows: dict[str, MonthlyProductRow] = {}
+    for name, units, sales, cost, price in products:
+        rows[name] = MonthlyProductRow(product_name=name, units_sold=int(units or 0), sales_total=sales or 0, cost_total=cost or 0, profit_total=(sales or 0) - (cost or 0), unit_price=price or 0)
+    for name, damage in damages.items():
+        row = rows.setdefault(name, MonthlyProductRow(product_name=name, units_sold=0, sales_total=0, cost_total=0, profit_total=0, unit_price=0))
+        row.damage_total = damage
+        row.cost_total += damage
+        row.profit_total -= damage
+    return sorted(rows.values(), key=lambda row: row.product_name)
+
+
 @router.get("/summary", response_model=DashboardSummary)
 def dashboard_summary(
     report_date: date | None = Query(default=None, alias="date"),
@@ -114,17 +136,10 @@ def dashboard_summary(
         .group_by(Product.name)
         .order_by(Product.name)
     ).all()
-    product_rows = [
-        MonthlyProductRow(
-            product_name=name,
-            units_sold=int(units or 0),
-            sales_total=sales or 0,
-            cost_total=cost or 0,
-            profit_total=(sales or 0) - (cost or 0),
-            unit_price=price or 0,
-        )
-        for name, units, sales, cost, price in products
-    ]
+    damages_today = damage_costs_by_product(database, start_of_day, end_of_day)
+    damage_cost_today = sum(damages_today.values(), Decimal("0"))
+    cost_today += damage_cost_today
+    product_rows = product_rows_with_damage(products, damages_today)
 
     return DashboardSummary(
         date=selected_date.isoformat(),
@@ -137,6 +152,7 @@ def dashboard_summary(
         previous_income_total=previous_income_total,
         expenses_today=expenses_today,
         cost_today=cost_today,
+        damage_cost_today=damage_cost_today,
         profit_today=income_today - cost_today - expenses_today,
         sales_today=sales_today,
         products_sold_today=int(products_sold_today),
@@ -174,8 +190,9 @@ def monthly_report(
         )
     ) or Decimal("0")
     products = database.execute(select(Product.name, func.sum(SaleItem.quantity), func.sum(SaleItem.quantity * SaleItem.unit_price), func.sum(SaleItem.quantity * SaleItem.unit_cost_snapshot), func.avg(SaleItem.unit_price)).join(SaleItem, SaleItem.product_id == Product.id).join(Sale, Sale.id == SaleItem.sale_id).where(Sale.created_at >= month_start, Sale.created_at < next_month, ~select(Credit.id).where(Credit.sale_id == Sale.id, Credit.status == "PENDING").exists()).group_by(Product.name).order_by(Product.name)).all()
-    product_rows = [MonthlyProductRow(product_name=name, units_sold=int(units or 0), sales_total=sales or 0, cost_total=cost or 0, profit_total=(sales or 0) - (cost or 0), unit_price=price or 0) for name, units, sales, cost, price in products]
-    return MonthlyReport(month=month, balance_total=balance_total, days=[value.isoformat() for value in date_list], income_by_day=[income_map.get(value, 0) for value in date_list], expenses_by_day=[expense_map.get(value, 0) for value in date_list], sales_by_day=[sales_map.get(value, 0) for value in date_list], total_income=sum(income_map.values(), Decimal("0")), total_expenses=sum(expense_map.values(), Decimal("0")), total_sales=sum(sales_map.values()), products=product_rows)
+    damages = damage_costs_by_product(database, month_start, next_month)
+    product_rows = product_rows_with_damage(products, damages)
+    return MonthlyReport(month=month, balance_total=balance_total, days=[value.isoformat() for value in date_list], income_by_day=[income_map.get(value, 0) for value in date_list], expenses_by_day=[expense_map.get(value, 0) for value in date_list], sales_by_day=[sales_map.get(value, 0) for value in date_list], total_income=sum(income_map.values(), Decimal("0")), total_expenses=sum(expense_map.values(), Decimal("0")), total_sales=sum(sales_map.values()), total_damage_costs=sum(damages.values(), Decimal("0")), products=product_rows)
 
 
 @router.get("/alerts", response_model=AlertsResponse)

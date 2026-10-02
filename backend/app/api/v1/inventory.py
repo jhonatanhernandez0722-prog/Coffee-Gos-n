@@ -120,8 +120,14 @@ def register_damage(
     if product.stock < payload.quantity:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Stock insuficiente para {product.name}")
 
+    unit_cost = payload.unit_cost or product.acquisition_cost
+    if unit_cost <= 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{product.name} no tiene costo de adquisición. Indica el costo unitario de la pérdida.")
+    if product.acquisition_cost <= 0:
+        product.acquisition_cost = unit_cost
+
     product.stock -= payload.quantity
-    loss_amount = product.acquisition_cost * payload.quantity
+    loss_amount = unit_cost * payload.quantity
     movement = InventoryMovement(
         product_id=product.id,
         user_id=current_user.id,
