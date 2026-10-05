@@ -57,7 +57,6 @@ def dashboard_summary(
             FinancialMovement.sale_id.is_not(None),
             financial_date >= start_of_day,
             financial_date < end_of_day,
-            ~select(Credit.id).where(Credit.sale_id == FinancialMovement.sale_id, Credit.status == "PENDING").exists(),
         )
     ) or Decimal("0")
     donation_income_total = database.scalar(
@@ -85,7 +84,6 @@ def dashboard_summary(
     balance_total = database.scalar(
         select(func.coalesce(func.sum(case((FinancialMovement.movement_type == "INCOME", FinancialMovement.amount), else_=-FinancialMovement.amount)), 0))
         .where(
-            ~select(Credit.id).where(Credit.sale_id == FinancialMovement.sale_id, Credit.status == "PENDING").exists(),
             (FinancialMovement.movement_type == "INCOME") | FinancialMovement.settled_at.is_not(None),
         )
     ) or Decimal("0")
@@ -110,8 +108,8 @@ def dashboard_summary(
         select(func.coalesce(func.sum(Credit.pending_amount), 0)).where(Credit.status == "PENDING")
     ) or Decimal("0")
     pending_credit_count = database.scalar(select(func.count(Credit.id)).where(Credit.status == "PENDING")) or 0
-    cash_balance = database.scalar(select(func.coalesce(func.sum(case((FinancialMovement.movement_type == "INCOME", FinancialMovement.amount), else_=-FinancialMovement.amount)), 0)).where(FinancialMovement.payment_method == "CASH", ~select(Credit.id).where(Credit.sale_id == FinancialMovement.sale_id, Credit.status == "PENDING").exists(), (FinancialMovement.movement_type == "INCOME") | FinancialMovement.settled_at.is_not(None))) or Decimal("0")
-    nequi_balance = database.scalar(select(func.coalesce(func.sum(case((FinancialMovement.movement_type == "INCOME", FinancialMovement.amount), else_=-FinancialMovement.amount)), 0)).where(FinancialMovement.payment_method == "NEQUI", ~select(Credit.id).where(Credit.sale_id == FinancialMovement.sale_id, Credit.status == "PENDING").exists(), (FinancialMovement.movement_type == "INCOME") | FinancialMovement.settled_at.is_not(None))) or Decimal("0")
+    cash_balance = database.scalar(select(func.coalesce(func.sum(case((FinancialMovement.movement_type == "INCOME", FinancialMovement.amount), else_=-FinancialMovement.amount)), 0)).where(FinancialMovement.payment_method == "CASH", (FinancialMovement.movement_type == "INCOME") | FinancialMovement.settled_at.is_not(None))) or Decimal("0")
+    nequi_balance = database.scalar(select(func.coalesce(func.sum(case((FinancialMovement.movement_type == "INCOME", FinancialMovement.amount), else_=-FinancialMovement.amount)), 0)).where(FinancialMovement.payment_method == "NEQUI", (FinancialMovement.movement_type == "INCOME") | FinancialMovement.settled_at.is_not(None))) or Decimal("0")
     low_stock_products = database.scalar(
         select(func.count(Product.id)).where(
             Product.is_active.is_(True),
@@ -175,7 +173,7 @@ def monthly_report(
     income_day = func.date_trunc("day", financial_date)
     expense_day = func.date_trunc("day", financial_date)
     sales_day = func.date_trunc("day", Sale.created_at)
-    income_by_day = database.execute(select(income_day, func.sum(FinancialMovement.amount)).where(FinancialMovement.movement_type == "INCOME", financial_date >= month_start, financial_date < next_month, ~select(Credit.id).where(Credit.sale_id == FinancialMovement.sale_id, Credit.status == "PENDING").exists()).group_by(income_day)).all()
+    income_by_day = database.execute(select(income_day, func.sum(FinancialMovement.amount)).where(FinancialMovement.movement_type == "INCOME", financial_date >= month_start, financial_date < next_month).group_by(income_day)).all()
     expense_by_day = database.execute(select(expense_day, func.sum(FinancialMovement.amount)).where(FinancialMovement.movement_type == "EXPENSE", FinancialMovement.settled_at.is_not(None), financial_date >= month_start, financial_date < next_month).group_by(expense_day)).all()
     sales_by_day = database.execute(select(sales_day, func.count(Sale.id)).where(Sale.created_at >= month_start, Sale.created_at < next_month).group_by(sales_day)).all()
     income_map = {value.date(): total or 0 for value, total in income_by_day}
@@ -185,7 +183,6 @@ def monthly_report(
     balance_total = database.scalar(
         select(func.coalesce(func.sum(case((FinancialMovement.movement_type == "INCOME", FinancialMovement.amount), else_=-FinancialMovement.amount)), 0))
         .where(
-            ~select(Credit.id).where(Credit.sale_id == FinancialMovement.sale_id, Credit.status == "PENDING").exists(),
             (FinancialMovement.movement_type == "INCOME") | FinancialMovement.settled_at.is_not(None),
         )
     ) or Decimal("0")

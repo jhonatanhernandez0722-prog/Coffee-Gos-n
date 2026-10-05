@@ -1,4 +1,4 @@
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -6,20 +6,26 @@ from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.api.v1.dependencies import require_admin
+from app.core.business_time import BUSINESS_TZ, business_day_bounds, business_today
 from app.core.permissions import require_section
 from app.db.session import get_db
 from app.models import Credit, FinancialMovement, InventoryMovement, Liability, OpeningBalanceCorrection, Product, Sale, SaleItem, User
-from app.schemas.financial_reports import BalanceReport, CashReconciliation, LiabilityCreate, LiabilityResponse, OpeningBalanceCorrectionCreate, OpeningBalanceCorrectionResponse, OpeningBalanceResponse
+from app.schemas.financial_reports import BalanceReport, CashReconciliation, MethodFlow, LiabilityCreate, LiabilityResponse, OpeningBalanceCorrectionCreate, OpeningBalanceCorrectionResponse, OpeningBalanceResponse
 
 router = APIRouter(prefix="/financial-reports", tags=["financial-reports"])
 
 
-def pending_credit_exists():
-    return ~select(Credit.id).where(Credit.sale_id == FinancialMovement.sale_id, Credit.status == "PENDING").exists()
+MONEY_DATE = func.coalesce(FinancialMovement.settled_at, FinancialMovement.occurred_at, FinancialMovement.created_at)
 
 
 def available_financial_filters():
-    return [pending_credit_exists(), (FinancialMovement.movement_type == "INCOME") | FinancialMovement.settled_at.is_not(None)]
+    # Las ventas a crédito no generan ingreso al venderse; cada abono es un ingreso real
+    # (aunque el crédito siga pendiente), así que no se excluye por estado del crédito.
+    return [FinancialMovement.movement_type.in_(("INCOME", "EXPENSE")), (FinancialMovement.movement_type == "INCOME") | FinancialMovement.settled_at.is_not(None)]
+
+
+def signed_amount():
+    return case((FinancialMovement.movement_type == "INCOME", FinancialMovement.amount), else_=-FinancialMovement.amount)
 
 
 def cash_balance(database: Session, method: str | None = None, as_of: datetime | None = None) -> Decimal:
@@ -27,18 +33,49 @@ def cash_balance(database: Session, method: str | None = None, as_of: datetime |
     if method:
         filters.append(FinancialMovement.payment_method == method)
     if as_of:
-        filters.append(func.coalesce(FinancialMovement.settled_at, FinancialMovement.occurred_at, FinancialMovement.created_at) < as_of)
-    filters.append(FinancialMovement.movement_type.in_(("INCOME", "EXPENSE")))
-    return database.scalar(
-        select(func.coalesce(func.sum(case((FinancialMovement.movement_type == "INCOME", FinancialMovement.amount), else_=-FinancialMovement.amount)), 0)).where(*filters)
-    ) or Decimal("0")
+        filters.append(MONEY_DATE < as_of)
+    return database.scalar(select(func.coalesce(func.sum(signed_amount()), 0)).where(*filters)) or Decimal("0")
 
 
 def pending_receivables(database: Session, as_of: datetime | None = None) -> Decimal:
-    filters = [Credit.status == "PENDING"]
-    if as_of:
-        filters.append(Credit.created_at < as_of)
-    return database.scalar(select(func.coalesce(func.sum(Credit.pending_amount), 0)).where(*filters)) or Decimal("0")
+    if as_of is None:
+        return database.scalar(select(func.coalesce(func.sum(Credit.pending_amount), 0)).where(Credit.status == "PENDING")) or Decimal("0")
+    # Saldo de cada crédito tal como estaba en esa fecha: lo fiado menos los abonos hechos antes del corte.
+    paid_before = (
+        select(func.coalesce(func.sum(FinancialMovement.amount), 0))
+        .where(FinancialMovement.sale_id == Credit.sale_id, FinancialMovement.movement_type == "INCOME", FinancialMovement.created_at < as_of)
+        .scalar_subquery()
+    )
+    return database.scalar(
+        select(func.coalesce(func.sum(func.greatest(Credit.original_amount - paid_before, 0)), 0)).where(Credit.created_at < as_of)
+    ) or Decimal("0")
+
+
+def day_flows(database: Session, start: datetime, end: datetime) -> dict[tuple[str, str], Decimal]:
+    is_credit_sale = select(Credit.id).where(Credit.sale_id == FinancialMovement.sale_id).exists()
+    category = case(
+        (FinancialMovement.movement_type == "EXPENSE", "expenses"),
+        (FinancialMovement.sale_id.is_(None), "other_income"),
+        (is_credit_sale, "credit_payments"),
+        else_="sales",
+    )
+    rows = database.execute(
+        select(FinancialMovement.payment_method, category, func.sum(FinancialMovement.amount))
+        .where(*available_financial_filters(), MONEY_DATE >= start, MONEY_DATE < end)
+        .group_by(FinancialMovement.payment_method, category)
+    ).all()
+    return {(method or "", kind): total or Decimal("0") for method, kind, total in rows}
+
+
+def method_flow(database: Session, method: str, start: datetime, end: datetime, flows: dict[tuple[str, str], Decimal]) -> MethodFlow:
+    return MethodFlow(
+        opening=cash_balance(database, method, start),
+        sales=flows.get((method, "sales"), Decimal("0")),
+        credit_payments=flows.get((method, "credit_payments"), Decimal("0")),
+        other_income=flows.get((method, "other_income"), Decimal("0")),
+        expenses=flows.get((method, "expenses"), Decimal("0")),
+        closing=cash_balance(database, method, end),
+    )
 
 
 def liability_response(liability: Liability) -> LiabilityResponse:
@@ -47,12 +84,25 @@ def liability_response(liability: Liability) -> LiabilityResponse:
 
 @router.get("/cash-reconciliation", response_model=CashReconciliation)
 def cash_reconciliation(report_date: date | None = None, database: Session = Depends(get_db), _: User = Depends(require_section("arqueo"))) -> CashReconciliation:
-    selected_date = report_date or datetime.now(timezone.utc).date()
-    as_of = datetime.combine(selected_date, time.max, tzinfo=timezone.utc) + timedelta(microseconds=1)
-    cash = cash_balance(database, "CASH", as_of)
-    bank = cash_balance(database, "NEQUI", as_of)
-    receivables = pending_receivables(database, as_of)
-    return CashReconciliation(date=selected_date, cash=cash, bank=bank, receivables=receivables, total=cash + bank + receivables)
+    selected_date = report_date or business_today()
+    start, end = business_day_bounds(selected_date)
+    flows = day_flows(database, start, end)
+    cash_flow = method_flow(database, "CASH", start, end, flows)
+    bank_flow = method_flow(database, "NEQUI", start, end, flows)
+    receivables = pending_receivables(database, end)
+    credits_granted = database.scalar(select(func.coalesce(func.sum(Credit.original_amount), 0)).where(Credit.created_at >= start, Credit.created_at < end)) or Decimal("0")
+    return CashReconciliation(
+        date=selected_date,
+        cash=cash_flow.closing,
+        bank=bank_flow.closing,
+        receivables=receivables,
+        total=cash_flow.closing + bank_flow.closing + receivables,
+        cash_flow=cash_flow,
+        bank_flow=bank_flow,
+        receivables_opening=pending_receivables(database, start),
+        credits_granted=credits_granted,
+        credits_collected=cash_flow.credit_payments + bank_flow.credit_payments,
+    )
 
 
 @router.get("/opening-balance", response_model=OpeningBalanceResponse)
@@ -101,7 +151,7 @@ def correct_opening_balance(
 
 def month_bounds(month: str) -> tuple[datetime, datetime]:
     try:
-        start = datetime.strptime(month, "%Y-%m").replace(tzinfo=timezone.utc)
+        start = datetime.strptime(month, "%Y-%m").replace(tzinfo=BUSINESS_TZ)
     except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El mes debe tener el formato AAAA-MM") from None
     next_month = (start.replace(day=28) + timedelta(days=4)).replace(day=1)
@@ -137,7 +187,7 @@ def balance_report(month: str | None = None, database: Session = Depends(get_db)
     total_liabilities = sum((liability.amount for liability in open_liabilities), Decimal("0"))
 
     income_date = func.coalesce(FinancialMovement.occurred_at, FinancialMovement.created_at)
-    income_filters = [FinancialMovement.movement_type == "INCOME", FinancialMovement.income_type.is_distinct_from("OPENING_BALANCE"), pending_credit_exists()]
+    income_filters = [FinancialMovement.movement_type == "INCOME", FinancialMovement.income_type.is_distinct_from("OPENING_BALANCE")]
     sale_cost_filters = [~select(Credit.id).where(Credit.sale_id == Sale.id, Credit.status == "PENDING").exists()]
     damage_filters = [FinancialMovement.movement_type == "COST"]
     expense_filters = [FinancialMovement.movement_type == "EXPENSE", FinancialMovement.settled_at.is_not(None)]

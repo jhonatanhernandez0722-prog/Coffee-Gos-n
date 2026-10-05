@@ -4,12 +4,26 @@ from decimal import Decimal
 from pydantic import BaseModel, Field
 
 
+class MethodFlow(BaseModel):
+    opening: Decimal
+    sales: Decimal
+    credit_payments: Decimal
+    other_income: Decimal
+    expenses: Decimal
+    closing: Decimal
+
+
 class CashReconciliation(BaseModel):
     date: date
     cash: Decimal
     bank: Decimal
     receivables: Decimal
     total: Decimal
+    cash_flow: MethodFlow
+    bank_flow: MethodFlow
+    receivables_opening: Decimal
+    credits_granted: Decimal
+    credits_collected: Decimal
 
 
 class OpeningBalanceResponse(BaseModel):

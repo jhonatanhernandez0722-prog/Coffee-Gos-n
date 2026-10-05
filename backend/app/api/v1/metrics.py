@@ -22,7 +22,7 @@ def metrics(
     end = datetime.combine(date_to or datetime.now(timezone.utc).date(), time.min, tzinfo=timezone.utc) + timedelta(days=1)
     start = datetime.combine(date_from or (end.date() - timedelta(days=29)), time.min, tzinfo=timezone.utc)
     day = func.date_trunc("day", FinancialMovement.created_at)
-    income_rows = database.execute(select(day, func.sum(FinancialMovement.amount)).where(FinancialMovement.movement_type == "INCOME", FinancialMovement.created_at >= start, FinancialMovement.created_at < end, ~select(Credit.id).where(Credit.sale_id == FinancialMovement.sale_id, Credit.status == "PENDING").exists()).group_by(day).order_by(day)).all()
+    income_rows = database.execute(select(day, func.sum(FinancialMovement.amount)).where(FinancialMovement.movement_type == "INCOME", FinancialMovement.created_at >= start, FinancialMovement.created_at < end).group_by(day).order_by(day)).all()
     expense_date = func.coalesce(FinancialMovement.settled_at, FinancialMovement.created_at)
     expense_day = func.date_trunc("day", expense_date)
     expense_rows = database.execute(select(expense_day, func.sum(FinancialMovement.amount)).where(FinancialMovement.movement_type == "EXPENSE", FinancialMovement.settled_at.is_not(None), expense_date >= start, expense_date < end).group_by(expense_day).order_by(expense_day)).all()

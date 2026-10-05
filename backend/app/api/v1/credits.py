@@ -1,10 +1,10 @@
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, aliased
 
 from app.api.v1.dependencies import require_admin
+from app.core.business_time import business_today
 from app.core.permissions import require_section
 from app.db.session import get_db
 from app.models import Credit, Customer, FinancialMovement, InventoryMovement, Product, Sale, SaleItem, SaleSupport, User
@@ -43,7 +43,7 @@ def register_credit_payment(credit_id: int, payload: CreditPaymentCreate, databa
     credit.pending_amount -= payload.amount
     if credit.pending_amount == 0:
         credit.status = "PAID"
-        credit.paid_at = datetime.now(timezone.utc).date()
+        credit.paid_at = business_today()
     from app.models import FinancialMovement
     database.add(FinancialMovement(user_id=current_user.id, movement_type="INCOME", amount=payload.amount, concept=f"Pago crédito {sale.sale_number}", payment_method=payload.payment_method, sale_id=sale.id))
     database.commit()

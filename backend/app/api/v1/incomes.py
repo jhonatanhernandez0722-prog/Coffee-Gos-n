@@ -1,4 +1,3 @@
-from datetime import datetime, time, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -6,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.v1.dependencies import require_admin
+from app.core.business_time import BUSINESS_TZ, business_midday
 from app.core.permissions import require_section
 from app.db.session import get_db
 from app.models import FinancialMovement, User
@@ -21,7 +21,7 @@ def response_for(movement: FinancialMovement) -> IncomeResponse:
         person_name=movement.person_name,
         income_type=movement.income_type or "OTHER",
         payment_method=movement.payment_method or "CASH",
-        occurred_on=(movement.occurred_at or movement.created_at).date(),
+        occurred_on=(movement.occurred_at or movement.created_at).astimezone(BUSINESS_TZ).date(),
         description=movement.observation or movement.concept,
         created_at=movement.created_at,
     )
@@ -65,7 +65,7 @@ def create_income(payload: IncomeCreate, database: Session = Depends(get_db), cu
         concept=payload.description.strip() or payload.income_type,
         payment_method=payload.payment_method,
         income_type=payload.income_type,
-        occurred_at=datetime.combine(payload.occurred_on, time.min, tzinfo=timezone.utc),
+        occurred_at=business_midday(payload.occurred_on),
         observation=payload.description.strip() or None,
     )
     database.add(movement)
@@ -83,7 +83,7 @@ def update_income(income_id: int, payload: IncomeCreate, database: Session = Dep
     movement.person_name = payload.person_name.strip()
     movement.income_type = payload.income_type
     movement.payment_method = payload.payment_method
-    movement.occurred_at = datetime.combine(payload.occurred_on, time.min, tzinfo=timezone.utc)
+    movement.occurred_at = business_midday(payload.occurred_on)
     movement.concept = payload.description.strip() or payload.income_type
     movement.observation = payload.description.strip() or None
     database.commit()
