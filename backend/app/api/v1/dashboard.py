@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, aliased
 from app.api.v1.dependencies import get_current_user
 from app.core.permissions import require_section
 from app.db.session import get_db
-from app.models import AlertRead, Credit, FinancialMovement, Product, Sale, SaleItem, User
+from app.models import AlertRead, Credit, FinancialMovement, InventoryMovement, Product, Sale, SaleItem, User
 from app.schemas.alerts import AlertItem, AlertReadRequest, AlertsResponse
 from app.schemas.dashboard import DashboardSummary, MonthlyProductRow, MonthlyReport
 
@@ -28,11 +28,61 @@ def damage_costs_by_product(database: Session, start: datetime, end: datetime) -
     return {name: total or Decimal("0") for name, total in rows}
 
 
-def product_rows_with_damage(products: list, damages: dict[str, Decimal]) -> list[MonthlyProductRow]:
+def product_sales(database: Session, start: datetime, end: datetime) -> list:
+    # Las unidades cuentan todas las ventas, también las de crédito sin pagar;
+    # ventas, costo y ganancia solo cuentan lo cobrado, igual que los ingresos.
+    pending_credit = select(Credit.id).where(Credit.sale_id == Sale.id, Credit.status == "PENDING").exists()
+    collected = lambda value: func.coalesce(func.sum(case((~pending_credit, value), else_=0)), 0)
+    return database.execute(
+        select(
+            Product.name,
+            func.sum(SaleItem.quantity),
+            func.coalesce(func.sum(case((pending_credit, SaleItem.quantity), else_=0)), 0),
+            collected(SaleItem.quantity * SaleItem.unit_price),
+            collected(SaleItem.quantity * SaleItem.unit_cost_snapshot),
+            func.avg(SaleItem.unit_price),
+        )
+        .join(SaleItem, SaleItem.product_id == Product.id)
+        .join(Sale, Sale.id == SaleItem.sale_id)
+        .where(Sale.created_at >= start, Sale.created_at < end)
+        .group_by(Product.name)
+        .order_by(Product.name)
+    ).all()
+
+
+def combo_component_units(database: Session, start: datetime, end: datetime) -> list:
+    # Unidades que salieron dentro de combos, según lo descontado del inventario.
+    # El dinero queda en la fila del combo; aquí solo se suman unidades.
+    pending_credit = select(Credit.id).where(Credit.sale_id == Sale.id, Credit.status == "PENDING").exists()
+    return database.execute(
+        select(
+            Product.name,
+            func.sum(InventoryMovement.quantity),
+            func.coalesce(func.sum(case((pending_credit, InventoryMovement.quantity), else_=0)), 0),
+        )
+        .join(Product, Product.id == InventoryMovement.product_id)
+        .join(Sale, Sale.id == InventoryMovement.sale_id)
+        .where(
+            InventoryMovement.movement_type == "SALE",
+            InventoryMovement.source_combo_product_id.is_not(None),
+            Product.is_combo.is_(False),
+            Sale.created_at >= start,
+            Sale.created_at < end,
+        )
+        .group_by(Product.name)
+    ).all()
+
+
+def product_rows_with_damage(products: list, damages: dict[str, Decimal], combo_units: list = ()) -> list[MonthlyProductRow]:
     # Las pérdidas por daño suman al costo del producto y restan de su ganancia.
     rows: dict[str, MonthlyProductRow] = {}
-    for name, units, sales, cost, price in products:
-        rows[name] = MonthlyProductRow(product_name=name, units_sold=int(units or 0), sales_total=sales or 0, cost_total=cost or 0, profit_total=(sales or 0) - (cost or 0), unit_price=price or 0)
+    for name, units, pending_units, sales, cost, price in products:
+        rows[name] = MonthlyProductRow(product_name=name, units_sold=int(units or 0), credit_pending_units=int(pending_units or 0), sales_total=sales or 0, cost_total=cost or 0, profit_total=(sales or 0) - (cost or 0), unit_price=price or 0)
+    for name, units, pending_units in combo_units:
+        row = rows.setdefault(name, MonthlyProductRow(product_name=name, units_sold=0, sales_total=0, cost_total=0, profit_total=0, unit_price=0))
+        row.combo_units = int(units or 0)
+        row.units_sold += row.combo_units
+        row.credit_pending_units += int(pending_units or 0)
     for name, damage in damages.items():
         row = rows.setdefault(name, MonthlyProductRow(product_name=name, units_sold=0, sales_total=0, cost_total=0, profit_total=0, unit_price=0))
         row.damage_total = damage
@@ -116,28 +166,11 @@ def dashboard_summary(
             Product.stock <= Product.low_stock_threshold,
         )
     ) or 0
-    products = database.execute(
-        select(
-            Product.name,
-            func.sum(SaleItem.quantity),
-            func.sum(SaleItem.quantity * SaleItem.unit_price),
-            func.sum(SaleItem.quantity * SaleItem.unit_cost_snapshot),
-            func.avg(SaleItem.unit_price),
-        )
-        .join(SaleItem, SaleItem.product_id == Product.id)
-        .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(
-            Sale.created_at >= start_of_day,
-            Sale.created_at < end_of_day,
-            ~select(Credit.id).where(Credit.sale_id == Sale.id, Credit.status == "PENDING").exists(),
-        )
-        .group_by(Product.name)
-        .order_by(Product.name)
-    ).all()
+    products = product_sales(database, start_of_day, end_of_day)
     damages_today = damage_costs_by_product(database, start_of_day, end_of_day)
     damage_cost_today = sum(damages_today.values(), Decimal("0"))
     cost_today += damage_cost_today
-    product_rows = product_rows_with_damage(products, damages_today)
+    product_rows = product_rows_with_damage(products, damages_today, combo_component_units(database, start_of_day, end_of_day))
 
     return DashboardSummary(
         date=selected_date.isoformat(),
@@ -186,9 +219,9 @@ def monthly_report(
             (FinancialMovement.movement_type == "INCOME") | FinancialMovement.settled_at.is_not(None),
         )
     ) or Decimal("0")
-    products = database.execute(select(Product.name, func.sum(SaleItem.quantity), func.sum(SaleItem.quantity * SaleItem.unit_price), func.sum(SaleItem.quantity * SaleItem.unit_cost_snapshot), func.avg(SaleItem.unit_price)).join(SaleItem, SaleItem.product_id == Product.id).join(Sale, Sale.id == SaleItem.sale_id).where(Sale.created_at >= month_start, Sale.created_at < next_month, ~select(Credit.id).where(Credit.sale_id == Sale.id, Credit.status == "PENDING").exists()).group_by(Product.name).order_by(Product.name)).all()
+    products = product_sales(database, month_start, next_month)
     damages = damage_costs_by_product(database, month_start, next_month)
-    product_rows = product_rows_with_damage(products, damages)
+    product_rows = product_rows_with_damage(products, damages, combo_component_units(database, month_start, next_month))
     return MonthlyReport(month=month, balance_total=balance_total, days=[value.isoformat() for value in date_list], income_by_day=[income_map.get(value, 0) for value in date_list], expenses_by_day=[expense_map.get(value, 0) for value in date_list], sales_by_day=[sales_map.get(value, 0) for value in date_list], total_income=sum(income_map.values(), Decimal("0")), total_expenses=sum(expense_map.values(), Decimal("0")), total_sales=sum(sales_map.values()), total_damage_costs=sum(damages.values(), Decimal("0")), products=product_rows)
 
 

@@ -6,6 +6,8 @@ from pydantic import BaseModel
 class MonthlyProductRow(BaseModel):
     product_name: str
     units_sold: int
+    credit_pending_units: int = 0
+    combo_units: int = 0
     sales_total: Decimal
     cost_total: Decimal
     profit_total: Decimal

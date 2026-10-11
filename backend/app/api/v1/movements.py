@@ -1,10 +1,11 @@
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, aliased
 
 from app.api.v1.dependencies import require_admin
+from app.core.business_time import business_day_bounds
 from app.core.permissions import require_section
 from app.db.session import get_db
 from app.models import Credit, Customer, FinancialMovement, InventoryMovement, Product, Sale, SaleItem, SaleSupport, User
@@ -32,6 +33,8 @@ def list_movements(
     date_from: date | None = Query(default=None),
     date_to: date | None = Query(default=None),
     movement_type: str | None = Query(default=None, max_length=20),
+    product_id: int | None = Query(default=None, gt=0),
+    payment_method: str | None = Query(default=None, pattern="^(CASH|NEQUI|CREDIT)$"),
     database: Session = Depends(get_db),
     _: User = Depends(require_section("movimientos")),
 ) -> MovementsResponse:
@@ -44,16 +47,34 @@ def list_movements(
     )
 
     if date_from:
-        start = datetime.combine(date_from, time.min, tzinfo=timezone.utc)
+        start, _end = business_day_bounds(date_from)
         inventory_statement = inventory_statement.where(InventoryMovement.created_at >= start)
         financial_statement = financial_statement.where(FinancialMovement.created_at >= start)
     if date_to:
-        end = datetime.combine(date_to, time.min, tzinfo=timezone.utc) + timedelta(days=1)
+        _start, end = business_day_bounds(date_to)
         inventory_statement = inventory_statement.where(InventoryMovement.created_at < end)
         financial_statement = financial_statement.where(FinancialMovement.created_at < end)
     if movement_type:
         inventory_statement = inventory_statement.where(InventoryMovement.movement_type == movement_type.upper())
         financial_statement = financial_statement.where(FinancialMovement.movement_type == movement_type.upper())
+    if product_id:
+        inventory_statement = inventory_statement.where(InventoryMovement.product_id == product_id)
+        # Solo los ingresos de ventas (o pagos de crédito) que movieron ese producto, incluso como componente de combo.
+        product_sale_ids = select(InventoryMovement.sale_id).where(InventoryMovement.product_id == product_id, InventoryMovement.sale_id.is_not(None))
+        financial_statement = financial_statement.where(FinancialMovement.sale_id.in_(product_sale_ids))
+    if payment_method:
+        linked_financial = aliased(FinancialMovement)
+        inventory_statement = (
+            inventory_statement
+            .outerjoin(Sale, Sale.id == InventoryMovement.sale_id)
+            .outerjoin(linked_financial, linked_financial.id == InventoryMovement.financial_movement_id)
+            .where(func.coalesce(Sale.payment_method, linked_financial.payment_method) == payment_method)
+        )
+        financial_statement = (
+            financial_statement
+            .outerjoin(Sale, Sale.id == FinancialMovement.sale_id)
+            .where(func.coalesce(FinancialMovement.payment_method, Sale.payment_method) == payment_method)
+        )
 
     inventory_rows = database.execute(inventory_statement.order_by(InventoryMovement.created_at.desc()).limit(100)).all()
     financial_rows = database.execute(financial_statement.order_by(FinancialMovement.created_at.desc()).limit(100)).all()

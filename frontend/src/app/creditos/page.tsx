@@ -33,6 +33,9 @@ const money = (value: number) =>
   }).format(value);
 const quantity = (value: number) =>
   new Intl.NumberFormat("es-CO", { maximumFractionDigits: 3 }).format(value);
+// Fecha (YYYY-MM-DD) en hora de Colombia, para comparar con los filtros de fecha.
+const businessDay = (value: string) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date(value));
 const mediaUrl = (path: string) =>
   /^https?:\/\//i.test(path) ? path : `${apiUrl.replace("/api/v1", "")}${path}`;
 
@@ -44,6 +47,11 @@ export default function CreditsPage() {
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "NEQUI">("CASH");
   const [paymentSaving, setPaymentSaving] = useState(false);
   const [customerFilter, setCustomerFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [productFilter, setProductFilter] = useState("");
+  const [paymentFilter, setPaymentFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [isAdmin] = useState(() => {
     if (typeof window === "undefined") return false;
     const storedUser = sessionStorage.getItem("coffee_gosen_user");
@@ -139,7 +147,31 @@ export default function CreditsPage() {
   }
 
   const normalize = (value: string) => value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  const visibleCredits = credits.filter((credit) => normalize(credit.customer_name).includes(normalize(customerFilter.trim())));
+  const productOptions = [...new Set(credits.flatMap((credit) => credit.products.map((product) => product.name)))].sort((a, b) => a.localeCompare(b, "es"));
+  const hasFilters = Boolean(customerFilter || dateFrom || dateTo || productFilter || paymentFilter || statusFilter);
+  const visibleCredits = credits
+    .filter((credit) => {
+      if (!normalize(credit.customer_name).includes(normalize(customerFilter.trim()))) return false;
+      const day = businessDay(credit.created_at);
+      if (dateFrom && day < dateFrom) return false;
+      if (dateTo && day > dateTo) return false;
+      if (productFilter && !credit.products.some((product) => product.name === productFilter)) return false;
+      if (paymentFilter === "NONE" && credit.payments.length > 0) return false;
+      if (paymentFilter && paymentFilter !== "NONE" && !credit.payments.some((payment) => payment.payment_method === paymentFilter)) return false;
+      if (statusFilter && credit.status !== statusFilter) return false;
+      return true;
+    })
+    // Pagados arriba, pendientes abajo; dentro de cada grupo, el más reciente primero.
+    .sort((a, b) => Number(a.status !== "PAID") - Number(b.status !== "PAID") || b.created_at.localeCompare(a.created_at));
+
+  function clearFilters() {
+    setCustomerFilter("");
+    setDateFrom("");
+    setDateTo("");
+    setProductFilter("");
+    setPaymentFilter("");
+    setStatusFilter("");
+  }
 
   function exportCredits() {
     downloadExcel(
@@ -186,7 +218,7 @@ export default function CreditsPage() {
           <strong className="screen-amount mt-4 block text-3xl text-emerald-700">{credits.filter((credit) => credit.status === "PAID").length}</strong>
         </article>
       </div>
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="mb-4 flex flex-wrap items-end gap-3">
         <label className="relative block w-full max-w-sm">
           <span className="sr-only">Filtrar por cliente</span>
           <Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
@@ -202,6 +234,43 @@ export default function CreditsPage() {
             </button>
           )}
         </label>
+        <label className="text-xs font-semibold">
+          Desde
+          <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="mt-1 block min-h-11 border border-[var(--line)] bg-white px-3 text-sm font-normal" />
+        </label>
+        <label className="text-xs font-semibold">
+          Hasta
+          <input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="mt-1 block min-h-11 border border-[var(--line)] bg-white px-3 text-sm font-normal" />
+        </label>
+        <label className="text-xs font-semibold">
+          Producto
+          <select value={productFilter} onChange={(event) => setProductFilter(event.target.value)} className="mt-1 block min-h-11 max-w-[14rem] border border-[var(--line)] bg-white px-3 text-sm font-normal">
+            <option value="">Todos</option>
+            {productOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+          </select>
+        </label>
+        <label className="text-xs font-semibold">
+          Pagado con
+          <select value={paymentFilter} onChange={(event) => setPaymentFilter(event.target.value)} className="mt-1 block min-h-11 border border-[var(--line)] bg-white px-3 text-sm font-normal">
+            <option value="">Todos</option>
+            <option value="CASH">Efectivo</option>
+            <option value="NEQUI">Nequi</option>
+            <option value="NONE">Sin pagos</option>
+          </select>
+        </label>
+        <label className="text-xs font-semibold">
+          Estado
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="mt-1 block min-h-11 border border-[var(--line)] bg-white px-3 text-sm font-normal">
+            <option value="">Todos</option>
+            <option value="PAID">Pagados</option>
+            <option value="PENDING">Pendientes</option>
+          </select>
+        </label>
+        {hasFilters && (
+          <button type="button" onClick={clearFilters} className="min-h-11 self-end border border-[var(--line)] bg-white px-3 text-sm font-semibold text-[var(--muted)]">
+            Limpiar filtros
+          </button>
+        )}
         <button
           type="button"
           onClick={exportCredits}
@@ -225,7 +294,7 @@ export default function CreditsPage() {
             <div>
               <h2 className="text-lg font-bold">Créditos registrados</h2>
               <p className="mt-1 text-sm text-[var(--muted)]">
-                {customerFilter ? `${visibleCredits.length} de ${credits.length} créditos para “${customerFilter.trim()}”` : `${credits.length} créditos encontrados`}
+                {hasFilters ? `${visibleCredits.length} de ${credits.length} créditos con los filtros aplicados` : `${credits.length} créditos encontrados`}
               </p>
             </div>
           </div>
@@ -236,7 +305,7 @@ export default function CreditsPage() {
           </div>
         ) : visibleCredits.length === 0 ? (
           <div className="p-10 text-center text-sm text-[var(--muted)]">
-            Ningún crédito coincide con “{customerFilter.trim()}”.
+            Ningún crédito coincide con los filtros.
           </div>
         ) : (
           <div className="overflow-x-auto">

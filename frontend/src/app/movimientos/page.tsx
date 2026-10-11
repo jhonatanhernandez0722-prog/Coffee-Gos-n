@@ -106,6 +106,8 @@ export default function MovementsPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [movementType, setMovementType] = useState("");
+  const [productFilter, setProductFilter] = useState("");
+  const [paymentFilter, setPaymentFilter] = useState("");
   const [editing, setEditing] = useState<Movement | null>(null);
   const [editQuantity, setEditQuantity] = useState("");
   const [editProductId, setEditProductId] = useState("");
@@ -127,6 +129,8 @@ export default function MovementsPage() {
     if (dateFrom) params.set("date_from", dateFrom);
     if (dateTo) params.set("date_to", dateTo);
     if (movementType) params.set("movement_type", movementType);
+    if (productFilter) params.set("product_id", productFilter);
+    if (paymentFilter) params.set("payment_method", paymentFilter);
 
     fetch(
       `${apiUrl}/movements${params.toString() ? `?${params.toString()}` : ""}`,
@@ -144,7 +148,23 @@ export default function MovementsPage() {
       })
       .then(setMovements)
       .catch((requestError: Error) => setError(userFacingError(requestError, "No fue posible cargar los movimientos.")));
-  }, [dateFrom, dateTo, movementType]);
+  }, [dateFrom, dateTo, movementType, productFilter, paymentFilter]);
+
+  const hasFilters = Boolean(dateFrom || dateTo || movementType || productFilter || paymentFilter);
+  const filterSubtitle = [
+    periodLabel(dateFrom, dateTo),
+    movementType ? labels[movementType] ?? movementType : "",
+    productFilter ? products.find((product) => String(product.id) === productFilter)?.name ?? "" : "",
+    paymentFilter ? paymentLabels[paymentFilter] ?? paymentFilter : "",
+  ].filter(Boolean).join(" · ");
+
+  function clearFilters() {
+    setDateFrom("");
+    setDateTo("");
+    setMovementType("");
+    setProductFilter("");
+    setPaymentFilter("");
+  }
 
   useEffect(() => {
     const token = sessionStorage.getItem("coffee_gosen_access_token");
@@ -384,13 +404,48 @@ export default function MovementsPage() {
                     <option value="DAMAGE">Pérdida por daño</option>
                   </select>
                 </label>
+                <label className="text-xs font-semibold">
+                  Producto
+                  <select
+                    value={productFilter}
+                    onChange={(event) => setProductFilter(event.target.value)}
+                    className="mt-1 block min-h-10 max-w-[14rem] border border-[var(--line)] bg-white px-3 text-sm font-normal"
+                  >
+                    <option value="">Todos</option>
+                    {[...products].sort((a, b) => a.name.localeCompare(b.name, "es")).map((product) => (
+                      <option key={product.id} value={product.id}>{product.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs font-semibold">
+                  Pago
+                  <select
+                    value={paymentFilter}
+                    onChange={(event) => setPaymentFilter(event.target.value)}
+                    className="mt-1 block min-h-10 border border-[var(--line)] bg-white px-3 text-sm font-normal"
+                  >
+                    <option value="">Todos</option>
+                    <option value="CASH">Efectivo</option>
+                    <option value="NEQUI">Nequi</option>
+                    <option value="CREDIT">Crédito</option>
+                  </select>
+                </label>
+                {hasFilters && (
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="min-h-10 border border-[var(--line)] bg-white px-3 text-sm font-semibold text-[var(--muted)]"
+                  >
+                    Limpiar filtros
+                  </button>
+                )}
                 <button
                   type="button"
                   disabled={movements.length === 0}
                   onClick={() =>
                     void downloadPdfReport({
                       title: "Registro de movimientos",
-                      subtitle: `${periodLabel(dateFrom, dateTo)}${movementType ? ` · ${labels[movementType] ?? movementType}` : ""}`,
+                      subtitle: filterSubtitle,
                       filename: `movimientos-${dateFrom || "inicio"}-${dateTo || "hoy"}.pdf`,
                       orientation: "landscape",
                       summary: [["Movimientos", String(movements.length)]],

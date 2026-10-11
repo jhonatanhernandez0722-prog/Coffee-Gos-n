@@ -102,6 +102,8 @@ type DashboardMetric = {
 type MonthlyProduct = {
   product_name: string;
   units_sold: number;
+  credit_pending_units?: number;
+  combo_units?: number;
   sales_total: number;
   cost_total: number;
   profit_total: number;
@@ -484,8 +486,8 @@ export default function DashboardPage() {
           {
             heading: "Rentabilidad por producto del día",
             columns: ["Producto", "Unidades", "Precio venta", "Ventas", "Costo", "Ganancia"],
-            rows: dailyProducts.map((product) => [product.product_name, formatUnits(Number(product.units_sold)), formatCurrency(product.unit_price), formatCurrency(product.sales_total), formatCurrency(product.cost_total), formatCurrency(product.profit_total)]),
-            emptyText: "No hay ventas cobradas para calcular rentabilidad en este día.",
+            rows: dailyProducts.map((product) => [product.product_name, `${formatUnits(Number(product.units_sold))}${Number(product.combo_units) > 0 ? ` (${formatUnits(Number(product.combo_units))} en combos)` : ""}${Number(product.credit_pending_units) > 0 ? ` (${formatUnits(Number(product.credit_pending_units))} a crédito)` : ""}`, formatCurrency(product.unit_price), formatCurrency(product.sales_total), formatCurrency(product.cost_total), formatCurrency(product.profit_total)]),
+            emptyText: "No hay ventas registradas en este día.",
           },
           ...(monthlyReport ? [{
             heading: `Resumen mensual (${reportMonth})`,
@@ -802,7 +804,7 @@ export default function DashboardPage() {
                 </div>
                 {dailyProducts.length === 0 ? (
                   <p className="mt-6 border-t border-[var(--line)] pt-6 text-sm text-[var(--muted)]">
-                    No hay ventas cobradas para calcular rentabilidad en este día.
+                    No hay ventas registradas en este día.
                   </p>
                 ) : (
                   <div className="mt-5 overflow-x-auto">
@@ -821,7 +823,7 @@ export default function DashboardPage() {
                         {dailyProducts.map((product) => (
                           <tr key={product.product_name} className="border-b border-[var(--line)] last:border-0">
                             <td className="p-3 font-semibold">{product.product_name}</td>
-                            <td className="p-3">{formatUnits(Number(product.units_sold))}</td>
+                            <td className="p-3">{formatUnits(Number(product.units_sold))}{Number(product.combo_units) > 0 && <span className="block text-xs text-[var(--muted)]">{formatUnits(Number(product.combo_units))} dentro de combos</span>}{Number(product.credit_pending_units) > 0 && <span className="block text-xs text-amber-700">{formatUnits(Number(product.credit_pending_units))} a crédito sin pagar</span>}</td>
                             <td className="p-3">{formatCurrency(product.unit_price)}</td>
                             <td className="p-3">{formatCurrency(product.sales_total)}</td>
                             <td className="p-3">{formatCurrency(product.cost_total)}{Number(product.damage_total) > 0 && <span className="block text-xs text-red-700">Incluye daño {formatCurrency(Number(product.damage_total))}</span>}</td>
@@ -970,7 +972,7 @@ export default function DashboardPage() {
                                 <td className="p-3 font-semibold">
                                   {product.product_name}
                                 </td>
-                                <td className="p-3">{formatUnits(Number(product.units_sold))}</td>
+                                <td className="p-3">{formatUnits(Number(product.units_sold))}{Number(product.combo_units) > 0 && <span className="block text-xs text-[var(--muted)]">{formatUnits(Number(product.combo_units))} dentro de combos</span>}{Number(product.credit_pending_units) > 0 && <span className="block text-xs text-amber-700">{formatUnits(Number(product.credit_pending_units))} a crédito sin pagar</span>}</td>
                                 <td className="p-3">
                                   {formatCurrency(product.unit_price)}
                                 </td>
