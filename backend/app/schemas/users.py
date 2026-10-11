@@ -27,3 +27,16 @@ class SellerResponse(BaseModel):
     role: str
     is_active: bool
     permissions: list[str]
+
+class PasswordChange(BaseModel):
+    password: str = Field(min_length=4, max_length=128)
+
+
+class AdminAccountResponse(BaseModel):
+    # Sin EmailStr: hay cuentas de administrador con correos locales (p. ej. demo@localhost).
+    id: int
+    full_name: str
+    email: str
+    role: str
+    is_active: bool
+    permissions: list[str] = Field(default_factory=list)

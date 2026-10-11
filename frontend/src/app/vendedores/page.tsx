@@ -27,6 +27,7 @@ type Seller = {
   is_active: boolean;
   permissions: string[];
 };
+type AdminAccount = Omit<Seller, "role"> & { role: "ADMIN" };
 type PermissionKey =
   | "dashboard"
   | "comanda"
@@ -68,6 +69,13 @@ export default function SellersPage() {
   const [permissions, setPermissions] = useState<PermissionKey[]>(["comanda"]);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [admins, setAdmins] = useState<AdminAccount[]>([]);
+  const [passwordTarget, setPasswordTarget] = useState<Seller | AdminAccount | null>(null);
+  const [newPin, setNewPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordNotice, setPasswordNotice] = useState("");
   const [isAdmin] = useState(() => {
     if (typeof window === "undefined") return false;
     const storedUser = sessionStorage.getItem("coffee_gosen_user");
@@ -84,6 +92,17 @@ export default function SellersPage() {
       throw new Error(result.detail ?? "No fue posible cargar los usuarios.");
     setSellers(result as Seller[]);
   }
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    const token = sessionStorage.getItem("coffee_gosen_access_token");
+    fetch(`${apiUrl}/users/admins`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
+      .then((response) => (response.ok ? response.json() : []))
+      .then((result) => setAdmins(result as AdminAccount[]))
+      .catch(() => setAdmins([]));
+  }, [isAdmin]);
 
   useEffect(() => {
     Promise.resolve()
@@ -197,6 +216,51 @@ export default function SellersPage() {
     await loadSellers();
   }
 
+  function openPasswordDialog(seller: Seller | AdminAccount) {
+    setPasswordTarget(seller);
+    setNewPin("");
+    setConfirmPin("");
+    setPasswordError("");
+    setPasswordNotice("");
+  }
+
+  async function changePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!passwordTarget) return;
+    if (targetIsAdmin ? newPin.length < 8 : !/^\d{4,8}$/.test(newPin)) {
+      setPasswordError(targetIsAdmin ? "La contraseña de un administrador debe tener al menos 8 caracteres." : "El PIN debe tener entre 4 y 8 dígitos.");
+      return;
+    }
+    if (newPin !== confirmPin) {
+      setPasswordError(targetIsAdmin ? "Las contraseñas no coinciden." : "Los PIN no coinciden.");
+      return;
+    }
+    setPasswordSaving(true);
+    setPasswordError("");
+    try {
+      const token = sessionStorage.getItem("coffee_gosen_access_token");
+      const response = await fetch(`${apiUrl}/users/${passwordTarget.id}/password`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ password: newPin }),
+      });
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.detail ?? "No fue posible cambiar la contraseña.");
+      }
+      setPasswordNotice(`Contraseña de ${passwordTarget.full_name} actualizada.`);
+      setPasswordTarget(null);
+    } catch (requestError) {
+      setPasswordError(userFacingError(requestError, "No fue posible cambiar la contraseña."));
+    } finally {
+      setPasswordSaving(false);
+    }
+  }
+
+  const targetIsAdmin = passwordTarget?.role === "ADMIN";
   const activeCount = sellers.filter((seller) => seller.is_active).length;
   const stats = [
     { label: "Usuarios", value: sellers.length, icon: Users },
@@ -217,6 +281,63 @@ export default function SellersPage() {
         >
           {error}
         </p>
+      )}
+      {passwordNotice && (
+        <p role="status" className="mb-6 flex items-center justify-between gap-3 border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+          {passwordNotice}
+          <button type="button" onClick={() => setPasswordNotice("")} aria-label="Cerrar aviso"><X size={16} /></button>
+        </p>
+      )}
+      {passwordTarget && (
+        <div className="fixed inset-0 z-30 grid place-items-center bg-[var(--ink)]/50 p-4">
+          <form onSubmit={changePassword} className="w-full max-w-md border border-[var(--line)] bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm text-[var(--muted)]">Cambiar contraseña</p>
+                <h2 className="mt-1 text-lg font-semibold">{passwordTarget.full_name}</h2>
+                <p className="mt-1 text-sm text-[var(--muted)]">{passwordTarget.email}</p>
+              </div>
+              <button type="button" onClick={() => setPasswordTarget(null)} aria-label="Cerrar cambio de contraseña"><X size={19} /></button>
+            </div>
+            <label className="mt-5 block text-sm font-semibold">
+              {targetIsAdmin ? "Nueva contraseña" : "Nuevo PIN"}
+              <input
+                required
+                autoFocus
+                type="password"
+                inputMode={targetIsAdmin ? "text" : "numeric"}
+                autoComplete="new-password"
+                minLength={targetIsAdmin ? 8 : 4}
+                maxLength={targetIsAdmin ? 128 : 8}
+                value={newPin}
+                onChange={(event) => setNewPin(targetIsAdmin ? event.target.value : event.target.value.replace(/\D/g, ""))}
+                placeholder={targetIsAdmin ? "Mínimo 8 caracteres" : "4 a 8 dígitos"}
+                className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal tracking-[0.3em] placeholder:tracking-normal"
+              />
+            </label>
+            <label className="mt-4 block text-sm font-semibold">
+              {targetIsAdmin ? "Confirmar contraseña" : "Confirmar PIN"}
+              <input
+                required
+                type="password"
+                inputMode={targetIsAdmin ? "text" : "numeric"}
+                autoComplete="new-password"
+                minLength={targetIsAdmin ? 8 : 4}
+                maxLength={targetIsAdmin ? 128 : 8}
+                value={confirmPin}
+                onChange={(event) => setConfirmPin(targetIsAdmin ? event.target.value : event.target.value.replace(/\D/g, ""))}
+                className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal tracking-[0.3em]"
+              />
+            </label>
+            {passwordError && <p role="alert" className="mt-4 border border-red-200 bg-red-50 p-3 text-sm text-red-700">{passwordError}</p>}
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => setPasswordTarget(null)} className="min-h-11 border border-[var(--line)] px-4 text-sm font-semibold">Cancelar</button>
+              <button type="submit" disabled={passwordSaving} className="inline-flex min-h-11 items-center gap-2 bg-[var(--blue-main)] px-4 text-sm font-semibold text-white disabled:opacity-60">
+                <KeyRound size={16} /> {passwordSaving ? "Guardando..." : "Cambiar contraseña"}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {stats.map(({ label, value, icon: Icon }, index) => (
@@ -295,7 +416,7 @@ export default function SellersPage() {
                     </div>
                   </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2 sm:pt-1">
+                <div className="flex shrink-0 flex-wrap items-center gap-2 sm:pt-1">
                   <span
                     className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${seller.is_active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}
                   >
@@ -309,6 +430,14 @@ export default function SellersPage() {
                       className="grid size-9 place-items-center border border-[var(--line)] bg-white text-[var(--blue-main)] hover:border-[var(--blue-main)]"
                     >
                       <Pencil size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openPasswordDialog(seller)}
+                      className="inline-flex min-h-9 items-center gap-1.5 border border-[var(--line)] bg-white px-3 text-xs font-semibold text-[var(--blue-main)] hover:border-[var(--blue-main)]"
+                    >
+                      <KeyRound size={13} />
+                      Cambiar contraseña
                     </button>
                     <button
                       onClick={() => toggleActive(seller)}
@@ -335,6 +464,32 @@ export default function SellersPage() {
               </div>
             )}
           </div>
+          {isAdmin && admins.length > 0 && (
+            <div className="border-t border-[var(--line)]">
+              <h3 className="px-5 pt-5 text-sm font-bold sm:px-6">Administradores</h3>
+              <div className="divide-y divide-[var(--line)]">
+                {admins.map((admin) => (
+                  <article key={admin.id} className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                    <div className="flex min-w-0 items-center gap-4">
+                      <span className="brand-mark size-12 shrink-0 rounded-2xl font-heading text-lg font-bold">{admin.full_name.charAt(0).toUpperCase()}</span>
+                      <div className="min-w-0">
+                        <strong className="text-base">{admin.full_name}</strong>
+                        <p className="mt-1 flex items-center gap-1.5 truncate text-sm text-[var(--muted)]"><Mail size={14} className="shrink-0" />{admin.email}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openPasswordDialog(admin)}
+                      className="inline-flex min-h-9 shrink-0 items-center gap-1.5 self-start border border-[var(--line)] bg-white px-3 text-xs font-semibold text-[var(--blue-main)] hover:border-[var(--blue-main)] sm:self-auto"
+                    >
+                      <KeyRound size={13} />
+                      Cambiar contraseña
+                    </button>
+                  </article>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
         {isAdmin && <form
           onSubmit={saveSeller}

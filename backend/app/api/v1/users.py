@@ -8,7 +8,7 @@ from app.core.permissions import SECTIONS, require_admin_or_viewer, user_section
 from app.core.security import hash_password
 from app.db.session import get_db
 from app.models import User, UserPermission
-from app.schemas.users import SellerCreate, SellerResponse, SellerUpdate
+from app.schemas.users import AdminAccountResponse, PasswordChange, SellerCreate, SellerResponse, SellerUpdate
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -81,3 +81,23 @@ def update_seller(user_id: int, payload: SellerUpdate, database: Session = Depen
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ya existe un usuario con ese correo") from None
     database.refresh(seller)
     return seller_response(seller)
+
+@router.get("/admins", response_model=list[AdminAccountResponse])
+def list_admins(database: Session = Depends(get_db), _: User = Depends(require_admin)) -> list[AdminAccountResponse]:
+    admins = database.scalars(select(User).where(User.role == "ADMIN").order_by(User.full_name)).all()
+    return [AdminAccountResponse(id=admin.id, full_name=admin.full_name, email=admin.email, role=admin.role, is_active=admin.is_active) for admin in admins]
+
+
+@router.put("/{user_id}/password", status_code=status.HTTP_204_NO_CONTENT)
+def change_password(user_id: int, payload: PasswordChange, database: Session = Depends(get_db), _: User = Depends(require_admin)) -> None:
+    user = database.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
+    # Vendedores y solo lectura entran con PIN; los administradores con contraseña de al menos 8 caracteres.
+    if user.role == "ADMIN":
+        if len(payload.password) < 8:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La contraseña de un administrador debe tener al menos 8 caracteres")
+    elif not payload.password.isdigit() or not 4 <= len(payload.password) <= 8:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El PIN debe tener entre 4 y 8 dígitos")
+    user.password_hash = hash_password(payload.password)
+    database.commit()
