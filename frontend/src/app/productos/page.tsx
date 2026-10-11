@@ -580,7 +580,7 @@ export default function ProductsPage() {
       setProducts((current) =>
         current.map((item) => (item.id === takeTarget.id ? { ...item, stock: Number(result.stock_after) } : item)),
       );
-      setStartedProducts((current) => {
+      if (!takeTarget.is_saleable) setStartedProducts((current) => {
         if (Number(result.stock_after) <= 0) return current.filter((item) => item.id !== takeTarget.id);
         const startedProduct = { ...takeTarget, stock: Number(result.stock_after) };
         return current.some((item) => item.id === takeTarget.id)
@@ -1093,13 +1093,15 @@ export default function ProductsPage() {
                   Comprar
                 </button>
               ) : null}
-              {section !== "sale" && <button
+              <button
                 type="button"
+                title="Uso interno: descuenta stock sin generar ingreso ni pérdida"
+                disabled={Number(product.stock) <= 0 || saving}
                 onClick={() => openTakeDialog(product)}
-                className="min-h-9 bg-[var(--blue-main)] px-3 text-xs font-semibold text-white"
+                className="min-h-9 bg-[var(--blue-main)] px-3 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Usar
-              </button>}
+                {section === "sale" ? "Uso interno" : "Usar"}
+              </button>
               <button
                 type="button"
                 disabled={Number(product.stock) <= 0 || saving}
