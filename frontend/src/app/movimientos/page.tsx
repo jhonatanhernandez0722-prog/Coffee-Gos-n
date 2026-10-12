@@ -67,6 +67,7 @@ const labels: Record<string, string> = {
   ADJUSTMENT: "Ajuste de inventario",
   INTERNAL_USE: "Uso interno",
   DAMAGE: "Pérdida por daño",
+  MISSING: "Desaparecido",
   INCOME: "Ingreso",
   EXPENSE: "Egreso",
   COST: "Costo por daño",
@@ -82,6 +83,7 @@ const typeStyles: Record<string, string> = {
   ADJUSTMENT: "border-slate-200 bg-slate-50 text-slate-700",
   INTERNAL_USE: "border-indigo-200 bg-indigo-50 text-indigo-800",
   DAMAGE: "border-red-200 bg-red-50 text-red-700",
+  MISSING: "border-amber-200 bg-amber-50 text-amber-800",
   INCOME: "border-emerald-200 bg-emerald-50 text-emerald-800",
   EXPENSE: "border-orange-200 bg-orange-50 text-orange-800",
   COST: "border-red-200 bg-red-50 text-red-700",
@@ -402,6 +404,7 @@ export default function MovementsPage() {
                     <option value="INTERNAL_USE">Uso interno</option>
                     <option value="ADJUSTMENT">Ajuste</option>
                     <option value="DAMAGE">Pérdida por daño</option>
+                    <option value="MISSING">Desaparecido</option>
                   </select>
                 </label>
                 <label className="text-xs font-semibold">

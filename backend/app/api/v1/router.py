@@ -41,6 +41,6 @@ def health_check() -> dict[str, str]:
 def metadata() -> dict[str, list[str]]:
     return {
         "payment_methods": ["CASH", "NEQUI", "CREDIT"],
-        "inventory_movement_types": ["PURCHASE", "SALE", "ADJUSTMENT", "INTERNAL_USE", "DAMAGE"],
+        "inventory_movement_types": ["PURCHASE", "SALE", "ADJUSTMENT", "INTERNAL_USE", "DAMAGE", "MISSING"],
         "roles": ["ADMIN", "SELLER", "VIEWER"],
     }

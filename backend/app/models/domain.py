@@ -26,6 +26,8 @@ class InventoryMovementType(StrEnum):
     SALE = "SALE"
     ADJUSTMENT = "ADJUSTMENT"
     INTERNAL_USE = "INTERNAL_USE"
+    DAMAGE = "DAMAGE"
+    MISSING = "MISSING"
 
 
 class CreditStatus(StrEnum):
@@ -268,3 +270,21 @@ class Liability(Base):
     status: Mapped[str] = mapped_column(String(20), default=LiabilityStatus.PENDING.value, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+class ProductDisappearance(Base):
+    """Unidades que desaparecieron: salen del stock sin ser venta, uso ni pérdida hasta que se decida qué pasó."""
+
+    __tablename__ = "product_disappearances"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    quantity: Mapped[Decimal] = mapped_column(Numeric(12, 3))
+    observation: Mapped[Optional[str]] = mapped_column(Text())
+    inventory_movement_id: Mapped[Optional[int]] = mapped_column(ForeignKey("inventory_movements.id", ondelete="SET NULL"))
+    status: Mapped[str] = mapped_column(String(20), default="PENDING", server_default="PENDING", index=True)
+    resolution: Mapped[Optional[str]] = mapped_column(String(20))
+    resolved_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"))
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)

@@ -153,7 +153,7 @@ export default function SellersPage() {
       setError("El PIN es obligatorio para crear el usuario.");
       return;
     }
-    if (permissions.length === 0) {
+    if (role === "SELLER" && permissions.length === 0) {
       setError("Selecciona al menos un apartado.");
       return;
     }
@@ -173,7 +173,8 @@ export default function SellersPage() {
             email,
             ...(pin ? { pin } : {}),
             role,
-            permissions,
+            // El ojeador siempre ve todo en modo consulta; no necesita apartados.
+            permissions: role === "VIEWER" ? [] : permissions,
           }),
         },
       );
@@ -397,7 +398,9 @@ export default function SellersPage() {
                       {seller.email}
                     </p>
                     <div className="mt-3 flex flex-wrap gap-1.5">
-                      {seller.permissions
+                      {seller.role === "VIEWER" ? (
+                        <span className="rounded-md border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs text-sky-800">Ve todos los apartados, sin modificar nada</span>
+                      ) : seller.permissions
                         .map(
                           (permission) =>
                             sections.find(
@@ -574,7 +577,11 @@ export default function SellersPage() {
               className="mt-2 min-h-11 w-full border border-[var(--line)] px-3 font-normal tracking-[0.3em] placeholder:tracking-normal"
             />
           </label>
-          <fieldset className="mt-5">
+          {role === "VIEWER" ? (
+            <p className="mt-5 border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+              El ojeador puede ver todos los apartados, pero no puede crear, editar ni borrar nada.
+            </p>
+          ) : <fieldset className="mt-5">
             <legend className="flex w-full items-center justify-between text-sm font-semibold">
               Apartados permitidos
               <span className="font-normal text-[var(--muted)]">
@@ -603,7 +610,7 @@ export default function SellersPage() {
                 </label>
               ))}
             </div>
-          </fieldset>
+          </fieldset>}
           <button
             disabled={saving}
             className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 bg-[var(--blue-main)] px-4 text-sm font-bold text-white hover:bg-[var(--blue-secondary)] disabled:opacity-60"

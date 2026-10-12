@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -45,15 +45,17 @@ def available_sellers(database: Session = Depends(get_db), _: User = Depends(get
 @router.post("", response_model=SellerResponse, status_code=status.HTTP_201_CREATED)
 def create_seller(payload: SellerCreate, database: Session = Depends(get_db), _: User = Depends(require_admin)) -> SellerResponse:
     validate_permissions(payload.permissions)
+    if database.scalar(select(User.id).where(func.lower(User.email) == payload.email.lower())):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ya existe un usuario con ese correo")
     seller = User(full_name=payload.full_name.strip(), email=payload.email, password_hash=hash_password(payload.pin), role=payload.role, is_active=True)
     database.add(seller)
     try:
         database.flush()
         database.add_all(UserPermission(user_id=seller.id, section=section) for section in set(payload.permissions))
         database.commit()
-    except IntegrityError:
+    except IntegrityError as error:
         database.rollback()
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ya existe un usuario con ese correo") from None
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No fue posible crear el usuario") from error
     database.refresh(seller)
     return seller_response(seller)
 

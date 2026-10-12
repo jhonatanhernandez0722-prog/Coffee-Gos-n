@@ -180,6 +180,8 @@ def update_inventory_movement(
     movement = database.get(InventoryMovement, movement_id)
     if movement is None:
         raise HTTPException(status_code=404, detail="Movimiento de inventario no encontrado")
+    if movement.movement_type == "MISSING":
+        raise HTTPException(status_code=409, detail="Las desapariciones se resuelven desde Productos > Desaparecidos")
     if movement.sale_id:
         raise HTTPException(status_code=409, detail="Los movimientos de una venta no se pueden editar individualmente")
 
@@ -336,6 +338,8 @@ def delete_movement(
         movement = database.get(InventoryMovement, movement_id)
         if movement is None:
             raise HTTPException(status_code=404, detail="Movimiento de inventario no encontrado")
+        if movement.movement_type == "MISSING":
+            raise HTTPException(status_code=409, detail="Las desapariciones se resuelven desde Productos > Desaparecidos")
         if movement.sale_id:
             sale = database.get(Sale, movement.sale_id)
             if sale is not None:

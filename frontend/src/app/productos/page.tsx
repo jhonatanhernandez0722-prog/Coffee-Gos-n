@@ -2,8 +2,9 @@
 
 import { FormEvent, KeyboardEvent, useEffect, useState } from "react";
 import Image from "next/image";
-import { ArchiveRestore, Download, Package, PackageX, Pencil, Plus, Search, X } from "lucide-react";
+import { ArchiveRestore, Download, Package, PackageX, Pencil, Plus, Search, SearchX, X } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
+import { DisappearancesPanel, ReportDisappearanceDialog } from "@/components/disappearances";
 import { apiUrl, userFacingError } from "@/lib/api";
 import { downloadExcel } from "@/lib/excel";
 
@@ -111,6 +112,8 @@ export default function ProductsPage() {
   const [takeAll, setTakeAll] = useState(false);
   const [takeObservation, setTakeObservation] = useState("Consumo interno");
   const [damageTarget, setDamageTarget] = useState<Product | null>(null);
+  const [missingTarget, setMissingTarget] = useState<Product | null>(null);
+  const [missingRefresh, setMissingRefresh] = useState(0);
   const [damageQuantity, setDamageQuantity] = useState("1");
   const [damageObservation, setDamageObservation] = useState("Producto dañado");
   const [damageCost, setDamageCost] = useState("");
@@ -697,6 +700,11 @@ export default function ProductsPage() {
         </p>
       )}
 
+      <DisappearancesPanel
+        refreshKey={missingRefresh}
+        onChanged={() => void loadCatalog().catch((requestError: Error) => setError(userFacingError(requestError, "No fue posible actualizar el catálogo.")))}
+      />
+
       <button
         type="button"
         onClick={exportProducts}
@@ -1110,6 +1118,15 @@ export default function ProductsPage() {
               >
                 <PackageX size={14} /> Reportar daño
               </button>
+              {!product.is_combo && <button
+                type="button"
+                title="Sacar del stock sin contarlo como venta, uso ni pérdida hasta saber qué pasó"
+                disabled={Number(product.stock) <= 0 || saving}
+                onClick={() => setMissingTarget(product)}
+                className="inline-flex min-h-9 items-center gap-2 border border-amber-200 bg-amber-50 px-3 text-xs font-semibold text-amber-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <SearchX size={14} /> Desaparición
+              </button>}
               <button
                 type="button"
                 disabled={saving}
@@ -1203,6 +1220,18 @@ export default function ProductsPage() {
         </div>
       )}
 
+      {missingTarget && (
+        <ReportDisappearanceDialog
+          product={missingTarget}
+          onClose={() => setMissingTarget(null)}
+          onReported={() => {
+            setMissingTarget(null);
+            setMissingRefresh((value) => value + 1);
+            void loadCatalog().catch((requestError: Error) => setError(userFacingError(requestError, "No fue posible actualizar el catálogo.")));
+          }}
+        />
+      )}
+
       {damageTarget && (
         <div className="fixed inset-0 z-30 grid place-items-center bg-[var(--ink)]/50 p-4">
           <form onSubmit={reportDamage} className="w-full max-w-md border border-red-200 bg-white p-6 shadow-2xl">
@@ -1253,16 +1282,16 @@ export default function ProductsPage() {
               </button>
             </div>
 
-            <label className="mt-5 flex items-center gap-3 text-sm font-semibold">
+            {!takeTarget.is_saleable && <label className="mt-5 flex items-center gap-3 text-sm font-semibold">
               <input type="checkbox" checked={takeAll} onChange={(event) => setTakeAll(event.target.checked)} />
               ¿Te gastaste todo el producto?
-            </label>
+            </label>}
 
             {!takeAll && <label className="mt-4 block text-sm font-semibold">
-              Cantidad gastada ({unitLabels[takeTarget.unit ?? "UNIT"]})
+              {takeTarget.is_saleable ? "Cantidad" : "Cantidad gastada"} ({unitLabels[takeTarget.unit ?? "UNIT"]}) · disponible: {formatStock(takeTarget)}
               <input
                 required
-                min="0.001"
+                min={takeTarget.unit === "UNIT" || takeTarget.unit === "PAQUETE" ? "1" : "0.001"}
                 max={Number(takeTarget.stock)}
                 step={takeTarget.unit === "UNIT" || takeTarget.unit === "PAQUETE" ? "1" : "0.001"}
                 type="number"
