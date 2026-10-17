@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CalendarDays, Download, Phone, Search, ShoppingBag, Users, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { CalendarDays, Download, HandCoins, Phone, Search, ShoppingBag, Users, X } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
+import { CustomerDebts } from "@/components/customer-debts";
 import { apiUrl, userFacingError } from "@/lib/api";
 import { downloadPdfReport } from "@/lib/pdf";
 
@@ -20,7 +21,10 @@ export default function ClientsPage() {
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [exportingId, setExportingId] = useState<number | null>(null);
-  useEffect(() => { const token = sessionStorage.getItem("coffee_gosen_access_token"); fetch(`${apiUrl}/customers/summary`, { headers: token ? { Authorization: `Bearer ${token}` } : undefined }).then(async (response) => { const result = await response.json(); if (!response.ok) throw new Error(result.detail ?? "No fue posible cargar los clientes."); return result as CustomerDashboard; }).then(setData).catch((requestError: Error) => setError(userFacingError(requestError, "No fue posible cargar los clientes."))); }, []);
+  const [debtsCustomer, setDebtsCustomer] = useState<Customer | null>(null);
+  const loadSummary = useCallback(() => { const token = sessionStorage.getItem("coffee_gosen_access_token"); fetch(`${apiUrl}/customers/summary`, { headers: token ? { Authorization: `Bearer ${token}` } : undefined }).then(async (response) => { const result = await response.json(); if (!response.ok) throw new Error(result.detail ?? "No fue posible cargar los clientes."); return result as CustomerDashboard; }).then(setData).catch((requestError: Error) => setError(userFacingError(requestError, "No fue posible cargar los clientes."))); }, []);
+  useEffect(() => { loadSummary(); }, [loadSummary]);
+  const closeDebts = useCallback(() => setDebtsCustomer(null), []);
 
   async function exportCustomer(customer: Customer) {
     setError("");
@@ -95,14 +99,16 @@ export default function ClientsPage() {
           <label className="relative block w-full max-w-sm"><span className="sr-only">Buscar clientes</span><Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)]" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar cliente" className="min-h-11 w-full border border-[var(--line)] pl-10 pr-10" />{search && <button type="button" aria-label="Limpiar búsqueda" onClick={() => setSearch("")} className="absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center text-[var(--muted)]"><X size={15} /></button>}</label>
         </div>
         {customers.length === 0 ? <div className="grid place-items-center gap-3 p-12 text-center"><span className="grid size-14 place-items-center rounded-2xl bg-[var(--blue-light)] text-[var(--blue-main)]"><Users size={26} /></span><p className="font-semibold">{search ? `Ningún cliente coincide con “${search}”.` : "No hay clientes registrados."}</p>{!search && <p className="max-w-xs text-sm text-[var(--muted)]">Los clientes se crean al registrar una venta con su nombre.</p>}</div> :
-        <div className="divide-y divide-[var(--line)]">{customers.map((customer) => <article key={customer.id} className="grid gap-4 p-5 transition-colors hover:bg-[var(--canvas)] sm:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))_auto] sm:items-center sm:px-6">
+        <div className="divide-y divide-[var(--line)]">{customers.map((customer) => <article key={customer.id} className="grid gap-4 p-5 transition-colors hover:bg-[var(--canvas)] sm:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))_auto_auto] sm:items-center sm:px-6">
           <div className="flex min-w-0 items-center gap-3"><span className="brand-mark size-11 shrink-0 font-heading text-base font-bold">{customer.name.charAt(0).toUpperCase()}</span><div className="min-w-0"><strong className="block truncate">{customer.name}</strong><span className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-[var(--muted)]">{customer.phone && <span className="inline-flex items-center gap-1"><Phone size={12} />{customer.phone}</span>}<span className="inline-flex items-center gap-1"><CalendarDays size={12} />{customer.last_purchase_at ? new Date(customer.last_purchase_at).toLocaleDateString("es-CO", { dateStyle: "medium" }) : "Sin compras"}</span></span></div></div>
           <div><p className="text-xs text-[var(--muted)]">Compras</p><p className="flex items-center gap-1.5 font-semibold"><ShoppingBag size={14} className="text-[var(--blue-main)]" />{customer.purchase_count}</p></div>
           <div><p className="text-xs text-[var(--muted)]">Total gastado</p><p className="font-semibold">{money(customer.total_spent)}</p></div>
           <div><p className="text-xs text-[var(--muted)]">Pendiente</p>{Number(customer.pending_credit) > 0 ? <p className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-sm font-semibold text-amber-800">{money(customer.pending_credit)}</p> : <p className="text-sm font-semibold text-emerald-700">Al día</p>}</div>
+          {Number(customer.pending_credit) > 0 ? <button type="button" onClick={() => setDebtsCustomer(customer)} className="inline-flex min-h-10 items-center justify-center gap-2 bg-[var(--blue-main)] px-3 text-sm font-semibold text-white hover:bg-[var(--blue-secondary)]"><HandCoins size={16} /> Ver deudas</button> : <span className="hidden sm:block" />}
           <button onClick={() => void exportCustomer(customer)} disabled={exportingId === customer.id} title="Descargar reporte PDF del cliente" aria-label={`Descargar PDF de ${customer.name}`} className="inline-flex min-h-10 items-center justify-center gap-2 border border-[var(--line)] bg-white px-3 text-sm font-semibold text-[var(--blue-main)] hover:border-[var(--blue-main)] disabled:opacity-60"><Download size={16} /> {exportingId === customer.id ? "Generando..." : "PDF"}</button>
         </article>)}</div>}
       </section>
     </>}
+    {debtsCustomer && <CustomerDebts customer={debtsCustomer} onClose={closeDebts} onPaid={loadSummary} />}
   </AdminPage>;
 }

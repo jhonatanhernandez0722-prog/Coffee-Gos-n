@@ -36,3 +36,15 @@ class CreditsResponse(BaseModel):
 class CreditPaymentCreate(BaseModel):
     amount: Decimal = Field(gt=0, decimal_places=2)
     payment_method: str = Field(pattern="^(CASH|NEQUI)$")
+
+
+class AppliedCreditPayment(BaseModel):
+    credit_id: int
+    sale_number: str
+    amount: Decimal
+    paid_off: bool
+
+
+class CustomerPaymentResult(BaseModel):
+    applied: list[AppliedCreditPayment]
+    remaining_debt: Decimal

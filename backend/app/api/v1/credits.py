@@ -1,3 +1,4 @@
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -5,10 +6,10 @@ from sqlalchemy.orm import Session, aliased
 
 from app.api.v1.dependencies import require_admin
 from app.core.business_time import business_today
-from app.core.permissions import require_section
+from app.core.permissions import require_any_section, require_section
 from app.db.session import get_db
 from app.models import Credit, Customer, FinancialMovement, InventoryMovement, Product, Sale, SaleItem, SaleSupport, User
-from app.schemas.credits import CreditPayment, CreditPaymentCreate, CreditProduct, CreditRow, CreditsResponse
+from app.schemas.credits import AppliedCreditPayment, CreditPayment, CreditPaymentCreate, CreditProduct, CreditRow, CreditsResponse, CustomerPaymentResult
 
 router = APIRouter(prefix="/credits", tags=["credits"])
 
@@ -47,7 +48,7 @@ def register_credit_payment(credit_id: int, payload: CreditPaymentCreate, databa
     from app.models import FinancialMovement
     database.add(FinancialMovement(user_id=current_user.id, movement_type="INCOME", amount=payload.amount, concept=f"Pago crédito {sale.sale_number}", payment_method=payload.payment_method, sale_id=sale.id))
     database.commit()
-    return next(row for row in list_credits(database, current_user).credits if row.id == credit.id)
+    return credit_rows(database, Credit.id == credit.id).credits[0]
 
 
 @router.post("/{credit_id}/payments", response_model=CreditRow)
@@ -88,6 +89,10 @@ def list_credits(
     database: Session = Depends(get_db),
     _: User = Depends(require_section("creditos")),
 ) -> CreditsResponse:
+    return credit_rows(database)
+
+
+def credit_rows(database: Session, *filters) -> CreditsResponse:
     seller = aliased(User)
     cashier = aliased(User)
     rows = database.execute(
@@ -96,6 +101,7 @@ def list_credits(
         .join(Customer, Customer.id == Credit.customer_id)
         .outerjoin(seller, seller.id == Sale.assigned_seller_id)
         .join(cashier, cashier.id == Sale.user_id)
+        .where(*filters)
         .order_by(Credit.created_at.desc())
     ).all()
     sale_ids = [credit.sale_id for credit, *_ in rows]
@@ -134,3 +140,51 @@ def list_credits(
         support_urls=support_urls.get(credit.sale_id, []),
         payments=payments.get(credit.sale_id, []),
     ) for credit, sale_number, customer_name, seller_name, cashier_name in rows])
+
+
+def pending_customer_credits(database: Session, customer_id: int, lock: bool = False) -> list[Credit]:
+    """Créditos pendientes del cliente, del más antiguo al más reciente (orden en que se abonan)."""
+    statement = select(Credit).where(Credit.customer_id == customer_id, Credit.status == "PENDING").order_by(Credit.created_at, Credit.id)
+    return list(database.scalars(statement.with_for_update() if lock else statement).all())
+
+
+@router.get("/customer/{customer_id}", response_model=CreditsResponse)
+def list_customer_credits(
+    customer_id: int,
+    database: Session = Depends(get_db),
+    _: User = Depends(require_any_section("clientes", "creditos")),
+) -> CreditsResponse:
+    return credit_rows(database, Credit.customer_id == customer_id, Credit.status == "PENDING")
+
+
+@router.post("/customer/{customer_id}/payments", response_model=CustomerPaymentResult)
+def pay_customer_credits(
+    customer_id: int,
+    payload: CreditPaymentCreate,
+    database: Session = Depends(get_db),
+    current_user: User = Depends(require_any_section("clientes", "creditos")),
+) -> CustomerPaymentResult:
+    credits = pending_customer_credits(database, customer_id, lock=True)
+    total_pending = sum((credit.pending_amount for credit in credits), Decimal("0"))
+    if not credits:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="El cliente no tiene créditos pendientes")
+    if payload.amount > total_pending:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El pago no puede superar lo que debe el cliente")
+    sale_numbers = dict(database.execute(select(Sale.id, Sale.sale_number).where(Sale.id.in_([credit.sale_id for credit in credits]))).all())
+    remaining = payload.amount
+    applied: list[AppliedCreditPayment] = []
+    # Todo en una transacción: el abono se aplica completo o no se aplica.
+    for credit in credits:
+        if remaining <= 0:
+            break
+        amount = min(remaining, credit.pending_amount)
+        remaining -= amount
+        credit.pending_amount -= amount
+        if credit.pending_amount == 0:
+            credit.status = "PAID"
+            credit.paid_at = business_today()
+        sale_number = sale_numbers.get(credit.sale_id, str(credit.sale_id))
+        database.add(FinancialMovement(user_id=current_user.id, movement_type="INCOME", amount=amount, concept=f"Pago crédito {sale_number}", payment_method=payload.payment_method, sale_id=credit.sale_id))
+        applied.append(AppliedCreditPayment(credit_id=credit.id, sale_number=sale_number, amount=amount, paid_off=credit.status == "PAID"))
+    database.commit()
+    return CustomerPaymentResult(applied=applied, remaining_debt=total_pending - payload.amount)
