@@ -5,8 +5,8 @@ import { Banknote, CalendarDays, CircleDollarSign, CreditCard } from "lucide-rea
 import { AdminPage } from "@/components/admin-page";
 import { apiUrl, userFacingError } from "@/lib/api";
 
-type MethodFlow = { opening: number; sales: number; credit_payments: number; other_income: number; expenses: number; closing: number };
-type DayMovement = { id: number; kind: "other_income" | "expenses"; payment_method: string; amount: number; concept: string; person_name: string | null };
+type MethodFlow = { opening: number; sales: number; credit_payments: number; other_income: number; expenses: number; transfers_in?: number; transfers_out?: number; closing: number };
+type DayMovement = { id: number; kind: "other_income" | "expenses" | "transfer_in" | "transfer_out"; payment_method: string; amount: number; concept: string; person_name: string | null };
 type Reconciliation = {
   date: string;
   cash: number;
@@ -39,10 +39,10 @@ function Breakdown({ title, icon: Icon, tone, lines, movements = [] }: { title: 
       </div>)}
     </dl>
     {movements.length > 0 && <div className="mt-5 border-t border-[var(--line)] pt-4">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Detalle de otros ingresos y egresos</h3>
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Detalle de otros ingresos, egresos y traslados</h3>
       <ul className="mt-2 space-y-2 text-sm">{movements.map((movement) => <li key={movement.id} className="flex items-baseline justify-between gap-4">
-        <span className="min-w-0 text-[var(--muted)]">{movement.concept}{movement.person_name ? ` · ${movement.person_name}` : ""}</span>
-        <span className={`shrink-0 tabular-nums ${movement.kind === "expenses" ? "text-red-700" : "text-emerald-700"}`}>{movement.kind === "expenses" ? "-" : "+"} {money(Number(movement.amount))}</span>
+        <span className="min-w-0 text-[var(--muted)]">{movement.kind === "transfer_in" ? "Traslado recibido · " : movement.kind === "transfer_out" ? "Traslado enviado · " : ""}{movement.concept}{movement.person_name ? ` · ${movement.person_name}` : ""}</span>
+        <span className={`shrink-0 tabular-nums ${["expenses", "transfer_out"].includes(movement.kind) ? "text-red-700" : "text-emerald-700"}`}>{["expenses", "transfer_out"].includes(movement.kind) ? "-" : "+"} {money(Number(movement.amount))}</span>
       </li>)}</ul>
     </div>}
   </article>;
@@ -54,6 +54,8 @@ const flowLines = (flow: MethodFlow): Line[] => [
   { label: "Abonos y pagos de créditos", value: flow.credit_payments, sign: "+" },
   { label: "Otros ingresos", value: flow.other_income, sign: "+" },
   { label: "Egresos", value: flow.expenses, sign: "-" },
+  ...(Number(flow.transfers_in) ? [{ label: "Traslados recibidos", value: Number(flow.transfers_in), sign: "+" as const }] : []),
+  ...(Number(flow.transfers_out) ? [{ label: "Traslados enviados", value: Number(flow.transfers_out), sign: "-" as const }] : []),
   { label: "Saldo al cierre", value: flow.closing, strong: true },
 ];
 

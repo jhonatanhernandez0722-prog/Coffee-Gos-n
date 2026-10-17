@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, aliased
 from app.api.v1.dependencies import require_admin
 from app.core.business_time import business_day_bounds
 from app.core.permissions import require_section
+from app.core.transfers import TRANSFER, transfer_pair
 from app.db.session import get_db
 from app.models import Credit, Customer, FinancialMovement, InventoryMovement, Product, Sale, SaleItem, SaleSupport, User
 from app.schemas.movements import FinancialMovementUpdate, InventoryMovementUpdate, MovementRow, MovementsResponse
@@ -295,6 +296,8 @@ def update_financial_movement(
         raise HTTPException(status_code=404, detail="Movimiento financiero no encontrado")
     if movement.sale_id:
         raise HTTPException(status_code=409, detail="Los movimientos de una venta no se pueden editar individualmente")
+    if movement.income_type == TRANSFER:
+        raise HTTPException(status_code=409, detail="Los traslados se eliminan y se vuelven a registrar desde Ingresar")
 
     if payload.amount is not None:
         movement.amount = payload.amount
@@ -366,6 +369,10 @@ def delete_movement(
             sale = database.get(Sale, movement.sale_id)
             if sale is not None:
                 delete_sale_records(sale, database)
+        elif movement.income_type == TRANSFER:
+            # Un traslado se borra completo: dejar solo una mitad descuadraría Efectivo y Nequi.
+            for half in transfer_pair(database, movement):
+                database.delete(half)
         else:
             linked_inventory = database.scalar(
                 select(InventoryMovement).where(

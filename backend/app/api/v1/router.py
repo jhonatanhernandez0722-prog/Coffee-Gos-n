@@ -14,6 +14,7 @@ from app.api.v1.incomes import router as incomes_router
 from app.api.v1.financial_reports import router as financial_reports_router
 from app.api.v1.users import router as users_router
 from app.api.v1.settings import router as settings_router
+from app.api.v1.transfers import router as transfers_router
 
 api_router = APIRouter()
 api_router.include_router(auth_router)
@@ -30,6 +31,7 @@ api_router.include_router(incomes_router)
 api_router.include_router(financial_reports_router)
 api_router.include_router(users_router)
 api_router.include_router(settings_router)
+api_router.include_router(transfers_router)
 
 
 @api_router.get("/health", tags=["health"])

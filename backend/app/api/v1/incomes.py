@@ -32,7 +32,7 @@ def independent_filters() -> list[object]:
         FinancialMovement.movement_type == "INCOME",
         FinancialMovement.sale_id.is_(None),
         FinancialMovement.income_type.is_not(None),
-        FinancialMovement.income_type != "OPENING_BALANCE",
+        FinancialMovement.income_type.not_in(("OPENING_BALANCE", "TRANSFER")),
     ]
 
 

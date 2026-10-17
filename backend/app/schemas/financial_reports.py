@@ -10,6 +10,8 @@ class MethodFlow(BaseModel):
     credit_payments: Decimal
     other_income: Decimal
     expenses: Decimal
+    transfers_in: Decimal = Decimal("0")
+    transfers_out: Decimal = Decimal("0")
     closing: Decimal
 
 

@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Banknote, CalendarDays, Check, Delete, HandCoins, History, Pencil, Smartphone, Trash2, UserRound, X } from "lucide-react";
 import { AdminPage } from "@/components/admin-page";
+import { TransferPanel } from "@/components/transfer-panel";
 import { apiUrl, userFacingError } from "@/lib/api";
 
 type IncomeType = "DONATION" | "OLD_INCOME" | "CONTRIBUTION" | "OTHER";
@@ -121,5 +122,6 @@ export default function IngresarPage() {
         </article>)}</div>}
       </section>
     </div>
+    <TransferPanel />
   </AdminPage>;
 }

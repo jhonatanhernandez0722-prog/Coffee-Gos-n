@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, aliased
 
 from app.api.v1.dependencies import get_current_user
 from app.core.permissions import require_section
+from app.core.transfers import not_transfer
 from app.db.session import get_db
 from app.models import AlertRead, Credit, FinancialMovement, InventoryMovement, Product, Sale, SaleItem, User
 from app.schemas.alerts import AlertItem, AlertReadRequest, AlertsResponse
@@ -126,6 +127,7 @@ def dashboard_summary(
     expenses_today = database.scalar(
         select(func.coalesce(func.sum(FinancialMovement.amount), 0)).where(
             FinancialMovement.movement_type == "EXPENSE",
+            not_transfer(),
             FinancialMovement.settled_at.is_not(None),
             financial_date >= start_of_day,
             financial_date < end_of_day,
@@ -206,8 +208,8 @@ def monthly_report(
     income_day = func.date_trunc("day", financial_date)
     expense_day = func.date_trunc("day", financial_date)
     sales_day = func.date_trunc("day", Sale.created_at)
-    income_by_day = database.execute(select(income_day, func.sum(FinancialMovement.amount)).where(FinancialMovement.movement_type == "INCOME", financial_date >= month_start, financial_date < next_month).group_by(income_day)).all()
-    expense_by_day = database.execute(select(expense_day, func.sum(FinancialMovement.amount)).where(FinancialMovement.movement_type == "EXPENSE", FinancialMovement.settled_at.is_not(None), financial_date >= month_start, financial_date < next_month).group_by(expense_day)).all()
+    income_by_day = database.execute(select(income_day, func.sum(FinancialMovement.amount)).where(FinancialMovement.movement_type == "INCOME", not_transfer(), financial_date >= month_start, financial_date < next_month).group_by(income_day)).all()
+    expense_by_day = database.execute(select(expense_day, func.sum(FinancialMovement.amount)).where(FinancialMovement.movement_type == "EXPENSE", not_transfer(), FinancialMovement.settled_at.is_not(None), financial_date >= month_start, financial_date < next_month).group_by(expense_day)).all()
     sales_by_day = database.execute(select(sales_day, func.count(Sale.id)).where(Sale.created_at >= month_start, Sale.created_at < next_month).group_by(sales_day)).all()
     income_map = {value.date(): total or 0 for value, total in income_by_day}
     expense_map = {value.date(): total or 0 for value, total in expense_by_day}

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.api.v1.dependencies import require_admin
 from app.core.business_time import BUSINESS_TZ, business_day_bounds, business_today
 from app.core.permissions import require_section
+from app.core.transfers import TRANSFER, not_transfer
 from app.db.session import get_db
 from app.models import Credit, FinancialMovement, InventoryMovement, Liability, OpeningBalanceCorrection, Product, Sale, SaleItem, User
 from app.schemas.financial_reports import BalanceReport, CashReconciliation, DayMovement, MethodFlow, LiabilityCreate, LiabilityResponse, OpeningBalanceCorrectionCreate, OpeningBalanceCorrectionResponse, OpeningBalanceResponse
@@ -53,7 +54,10 @@ def pending_receivables(database: Session, as_of: datetime | None = None) -> Dec
 
 def day_flows(database: Session, start: datetime, end: datetime) -> dict[tuple[str, str], Decimal]:
     is_credit_sale = select(Credit.id).where(Credit.sale_id == FinancialMovement.sale_id).exists()
+    is_transfer = FinancialMovement.income_type == TRANSFER
     category = case(
+        (is_transfer & (FinancialMovement.movement_type == "INCOME"), "transfers_in"),
+        (is_transfer, "transfers_out"),
         (FinancialMovement.movement_type == "EXPENSE", "expenses"),
         (FinancialMovement.sale_id.is_(None), "other_income"),
         (is_credit_sale, "credit_payments"),
@@ -68,7 +72,7 @@ def day_flows(database: Session, start: datetime, end: datetime) -> dict[tuple[s
 
 
 def day_movements(database: Session, start: datetime, end: datetime) -> list[DayMovement]:
-    """Detalle de los otros ingresos y egresos del día, para saber de dónde sale cada valor del arqueo."""
+    """Detalle de los otros ingresos, egresos y traslados del día, para saber de dónde sale cada valor del arqueo."""
     movements = database.scalars(
         select(FinancialMovement)
         .where(*available_financial_filters(), FinancialMovement.sale_id.is_(None), MONEY_DATE >= start, MONEY_DATE < end)
@@ -77,7 +81,7 @@ def day_movements(database: Session, start: datetime, end: datetime) -> list[Day
     return [
         DayMovement(
             id=movement.id,
-            kind="expenses" if movement.movement_type == "EXPENSE" else "other_income",
+            kind=("transfer_in" if movement.movement_type == "INCOME" else "transfer_out") if movement.income_type == TRANSFER else "expenses" if movement.movement_type == "EXPENSE" else "other_income",
             payment_method=movement.payment_method or "",
             amount=movement.amount,
             concept=movement.observation or movement.concept,
@@ -94,6 +98,8 @@ def method_flow(database: Session, method: str, start: datetime, end: datetime, 
         credit_payments=flows.get((method, "credit_payments"), Decimal("0")),
         other_income=flows.get((method, "other_income"), Decimal("0")),
         expenses=flows.get((method, "expenses"), Decimal("0")),
+        transfers_in=flows.get((method, "transfers_in"), Decimal("0")),
+        transfers_out=flows.get((method, "transfers_out"), Decimal("0")),
         closing=cash_balance(database, method, end),
     )
 
@@ -208,10 +214,10 @@ def balance_report(month: str | None = None, database: Session = Depends(get_db)
     total_liabilities = sum((liability.amount for liability in open_liabilities), Decimal("0"))
 
     income_date = func.coalesce(FinancialMovement.occurred_at, FinancialMovement.created_at)
-    income_filters = [FinancialMovement.movement_type == "INCOME", FinancialMovement.income_type.is_distinct_from("OPENING_BALANCE")]
+    income_filters = [FinancialMovement.movement_type == "INCOME", FinancialMovement.income_type.is_distinct_from("OPENING_BALANCE"), not_transfer()]
     sale_cost_filters = [~select(Credit.id).where(Credit.sale_id == Sale.id, Credit.status == "PENDING").exists()]
     damage_filters = [FinancialMovement.movement_type == "COST"]
-    expense_filters = [FinancialMovement.movement_type == "EXPENSE", FinancialMovement.settled_at.is_not(None)]
+    expense_filters = [FinancialMovement.movement_type == "EXPENSE", FinancialMovement.settled_at.is_not(None), not_transfer()]
     if period_start and period_end:
         income_filters += [income_date >= period_start, income_date < period_end]
         sale_cost_filters += [Sale.created_at >= period_start, Sale.created_at < period_end]
