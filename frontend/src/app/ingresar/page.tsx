@@ -9,7 +9,11 @@ type IncomeType = "DONATION" | "OLD_INCOME" | "CONTRIBUTION" | "OTHER";
 type Income = { id: number; amount: number; person_name: string | null; income_type: IncomeType; payment_method: "CASH" | "NEQUI"; occurred_on: string; description: string; created_at: string };
 const money = (value: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(value);
 const typeLabels: Record<IncomeType, string> = { DONATION: "Donación", OLD_INCOME: "Ingreso antiguo", CONTRIBUTION: "Aporte", OTHER: "Otro" };
-const today = () => new Date().toISOString().slice(0, 10);
+/** Fecha de hoy en la zona horaria del equipo (no en UTC: después de las 7 p. m. en Colombia UTC ya es mañana). */
+function today() {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
 
 export default function IngresarPage() {
   const [amount, setAmount] = useState("");
@@ -93,7 +97,7 @@ export default function IngresarPage() {
         <fieldset className="mt-4"><legend className="text-sm font-semibold">Método</legend><div className="mt-2 grid grid-cols-2 gap-2"><button type="button" aria-pressed={paymentMethod === "CASH"} onClick={() => setPaymentMethod("CASH")} className="choice"><Banknote size={16} />Efectivo</button><button type="button" aria-pressed={paymentMethod === "NEQUI"} onClick={() => setPaymentMethod("NEQUI")} className="choice"><Smartphone size={16} />Nequi</button></div></fieldset>
 
         <label className="mt-5 block text-sm font-semibold">Persona<input required minLength={2} maxLength={120} value={personName} onChange={(event) => setPersonName(event.target.value)} placeholder="Nombre de quien entrega el dinero" className="mt-2 min-h-12 w-full border border-[var(--line)] px-3 font-normal" /></label>
-        <label className="mt-4 block text-sm font-semibold">Fecha<input required type="date" value={occurredOn} onChange={(event) => setOccurredOn(event.target.value)} className="mt-2 min-h-12 w-full border border-[var(--line)] px-3 font-normal" /></label>
+        <label className="mt-4 block text-sm font-semibold">Fecha<input required type="date" value={occurredOn} max={today()} onChange={(event) => setOccurredOn(event.target.value)} className="mt-2 min-h-12 w-full border border-[var(--line)] px-3 font-normal" /></label>
         <label className="mt-4 block text-sm font-semibold">Descripción <span className="font-normal text-[var(--muted)]">(opcional)</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} maxLength={500} rows={2} placeholder="Ej. aporte para caja menor" className="mt-2 w-full border border-[var(--line)] px-3 py-3 font-normal" /></label>
 
         <button type="submit" disabled={saving} className="mt-6 flex min-h-14 w-full items-center justify-center gap-2 bg-[var(--blue-main)] px-5 text-base font-bold text-white transition hover:bg-[var(--blue-secondary)] disabled:opacity-60"><Check size={19} />{saving ? "Guardando..." : editing ? "Guardar cambios" : "Confirmar ingreso"}</button>

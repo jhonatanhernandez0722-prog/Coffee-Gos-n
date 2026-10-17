@@ -272,7 +272,7 @@ export default function DashboardPage() {
     null,
   );
   const [reportMonth, setReportMonth] = useState(() =>
-    new Date().toISOString().slice(0, 7),
+    localToday().slice(0, 7),
   );
 
   useEffect(() => {

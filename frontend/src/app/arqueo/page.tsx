@@ -6,6 +6,7 @@ import { AdminPage } from "@/components/admin-page";
 import { apiUrl, userFacingError } from "@/lib/api";
 
 type MethodFlow = { opening: number; sales: number; credit_payments: number; other_income: number; expenses: number; closing: number };
+type DayMovement = { id: number; kind: "other_income" | "expenses"; payment_method: string; amount: number; concept: string; person_name: string | null };
 type Reconciliation = {
   date: string;
   cash: number;
@@ -17,6 +18,7 @@ type Reconciliation = {
   receivables_opening: number;
   credits_granted: number;
   credits_collected: number;
+  movements?: DayMovement[];
 };
 const money = (value: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(value);
 /** Fecha de hoy en la zona horaria del equipo (no en UTC). */
@@ -27,7 +29,7 @@ function localToday() {
 
 type Line = { label: string; value: number; sign?: "+" | "-"; strong?: boolean };
 
-function Breakdown({ title, icon: Icon, tone, lines }: { title: string; icon: typeof Banknote; tone: string; lines: Line[] }) {
+function Breakdown({ title, icon: Icon, tone, lines, movements = [] }: { title: string; icon: typeof Banknote; tone: string; lines: Line[]; movements?: DayMovement[] }) {
   return <article className="border border-[var(--line)] bg-white p-6">
     <div className="flex items-center gap-3"><span className={`grid size-10 place-items-center rounded-xl ${tone}`}><Icon size={19} /></span><h2 className="font-semibold">{title}</h2></div>
     <dl className="mt-5 space-y-2 text-sm">
@@ -36,6 +38,13 @@ function Breakdown({ title, icon: Icon, tone, lines }: { title: string; icon: ty
         <dd className={`tabular-nums ${sign === "-" ? "text-red-700" : sign === "+" ? "text-emerald-700" : ""} ${strong ? "text-lg" : ""}`}>{sign && Number(value) !== 0 ? `${sign} ` : ""}{money(Number(value))}</dd>
       </div>)}
     </dl>
+    {movements.length > 0 && <div className="mt-5 border-t border-[var(--line)] pt-4">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Detalle de otros ingresos y egresos</h3>
+      <ul className="mt-2 space-y-2 text-sm">{movements.map((movement) => <li key={movement.id} className="flex items-baseline justify-between gap-4">
+        <span className="min-w-0 text-[var(--muted)]">{movement.concept}{movement.person_name ? ` · ${movement.person_name}` : ""}</span>
+        <span className={`shrink-0 tabular-nums ${movement.kind === "expenses" ? "text-red-700" : "text-emerald-700"}`}>{movement.kind === "expenses" ? "-" : "+"} {money(Number(movement.amount))}</span>
+      </li>)}</ul>
+    </div>}
   </article>;
 }
 
@@ -73,8 +82,8 @@ export default function CashReconciliationPage() {
       </div>
       <h2 className="mb-3 mt-8 text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">Movimiento del día</h2>
       <div className="grid gap-4 lg:grid-cols-3">
-        <Breakdown title="Efectivo en Caja" icon={Banknote} tone="text-emerald-700 bg-emerald-50" lines={flowLines(data.cash_flow)} />
-        <Breakdown title="Banco / Nequi" icon={CircleDollarSign} tone="text-violet-700 bg-violet-50" lines={flowLines(data.bank_flow)} />
+        <Breakdown title="Efectivo en Caja" icon={Banknote} tone="text-emerald-700 bg-emerald-50" lines={flowLines(data.cash_flow)} movements={data.movements?.filter((movement) => movement.payment_method === "CASH")} />
+        <Breakdown title="Banco / Nequi" icon={CircleDollarSign} tone="text-violet-700 bg-violet-50" lines={flowLines(data.bank_flow)} movements={data.movements?.filter((movement) => movement.payment_method === "NEQUI")} />
         <Breakdown title="Cuentas por cobrar" icon={CreditCard} tone="text-amber-700 bg-amber-50" lines={[
           { label: "Pendiente al iniciar el día", value: data.receivables_opening },
           { label: "Fiado en el día", value: data.credits_granted, sign: "+" },

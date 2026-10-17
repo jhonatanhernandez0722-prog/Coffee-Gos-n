@@ -10,7 +10,7 @@ from app.core.business_time import BUSINESS_TZ, business_day_bounds, business_to
 from app.core.permissions import require_section
 from app.db.session import get_db
 from app.models import Credit, FinancialMovement, InventoryMovement, Liability, OpeningBalanceCorrection, Product, Sale, SaleItem, User
-from app.schemas.financial_reports import BalanceReport, CashReconciliation, MethodFlow, LiabilityCreate, LiabilityResponse, OpeningBalanceCorrectionCreate, OpeningBalanceCorrectionResponse, OpeningBalanceResponse
+from app.schemas.financial_reports import BalanceReport, CashReconciliation, DayMovement, MethodFlow, LiabilityCreate, LiabilityResponse, OpeningBalanceCorrectionCreate, OpeningBalanceCorrectionResponse, OpeningBalanceResponse
 
 router = APIRouter(prefix="/financial-reports", tags=["financial-reports"])
 
@@ -67,6 +67,26 @@ def day_flows(database: Session, start: datetime, end: datetime) -> dict[tuple[s
     return {(method or "", kind): total or Decimal("0") for method, kind, total in rows}
 
 
+def day_movements(database: Session, start: datetime, end: datetime) -> list[DayMovement]:
+    """Detalle de los otros ingresos y egresos del día, para saber de dónde sale cada valor del arqueo."""
+    movements = database.scalars(
+        select(FinancialMovement)
+        .where(*available_financial_filters(), FinancialMovement.sale_id.is_(None), MONEY_DATE >= start, MONEY_DATE < end)
+        .order_by(MONEY_DATE, FinancialMovement.id)
+    ).all()
+    return [
+        DayMovement(
+            id=movement.id,
+            kind="expenses" if movement.movement_type == "EXPENSE" else "other_income",
+            payment_method=movement.payment_method or "",
+            amount=movement.amount,
+            concept=movement.observation or movement.concept,
+            person_name=movement.person_name,
+        )
+        for movement in movements
+    ]
+
+
 def method_flow(database: Session, method: str, start: datetime, end: datetime, flows: dict[tuple[str, str], Decimal]) -> MethodFlow:
     return MethodFlow(
         opening=cash_balance(database, method, start),
@@ -102,6 +122,7 @@ def cash_reconciliation(report_date: date | None = None, database: Session = Dep
         receivables_opening=pending_receivables(database, start),
         credits_granted=credits_granted,
         credits_collected=cash_flow.credit_payments + bank_flow.credit_payments,
+        movements=day_movements(database, start, end),
     )
 
 

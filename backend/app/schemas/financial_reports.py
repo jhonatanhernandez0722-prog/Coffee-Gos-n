@@ -13,6 +13,15 @@ class MethodFlow(BaseModel):
     closing: Decimal
 
 
+class DayMovement(BaseModel):
+    id: int
+    kind: str
+    payment_method: str
+    amount: Decimal
+    concept: str
+    person_name: str | None
+
+
 class CashReconciliation(BaseModel):
     date: date
     cash: Decimal
@@ -24,6 +33,7 @@ class CashReconciliation(BaseModel):
     receivables_opening: Decimal
     credits_granted: Decimal
     credits_collected: Decimal
+    movements: list[DayMovement] = []
 
 
 class OpeningBalanceResponse(BaseModel):
