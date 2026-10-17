@@ -78,7 +78,8 @@ export default function ClientsPage() {
   }
 
   const customers = (data?.customers.filter((customer) => customer.name.toLowerCase().includes(search.toLowerCase())) ?? [])
-    .sort((first, second) => (second.last_purchase_at ? new Date(second.last_purchase_at).getTime() : 0) - (first.last_purchase_at ? new Date(first.last_purchase_at).getTime() : 0));
+    // Primero los que deben; dentro de cada grupo, la compra más reciente primero.
+    .sort((first, second) => Number(Number(second.pending_credit) > 0) - Number(Number(first.pending_credit) > 0) || (second.last_purchase_at ? new Date(second.last_purchase_at).getTime() : 0) - (first.last_purchase_at ? new Date(first.last_purchase_at).getTime() : 0));
   const stats = data ? [
     { label: "Clientes registrados", value: String(data.total_customers) },
     { label: "Compras registradas", value: String(data.total_purchases) },
@@ -95,7 +96,7 @@ export default function ClientsPage() {
       </div>
       <section className="mt-6 border border-[var(--line)] bg-white">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] p-5">
-          <div><h2 className="text-lg font-bold">Historial por cliente</h2><p className="text-sm text-[var(--muted)]">Ordenados por la compra más reciente.</p></div>
+          <div><h2 className="text-lg font-bold">Historial por cliente</h2><p className="text-sm text-[var(--muted)]">Primero los que tienen deuda; luego por la compra más reciente.</p></div>
           <label className="relative block w-full max-w-sm"><span className="sr-only">Buscar clientes</span><Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)]" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar cliente" className="min-h-11 w-full border border-[var(--line)] pl-10 pr-10" />{search && <button type="button" aria-label="Limpiar búsqueda" onClick={() => setSearch("")} className="absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center text-[var(--muted)]"><X size={15} /></button>}</label>
         </div>
         {customers.length === 0 ? <div className="grid place-items-center gap-3 p-12 text-center"><span className="grid size-14 place-items-center rounded-2xl bg-[var(--blue-light)] text-[var(--blue-main)]"><Users size={26} /></span><p className="font-semibold">{search ? `Ningún cliente coincide con “${search}”.` : "No hay clientes registrados."}</p>{!search && <p className="max-w-xs text-sm text-[var(--muted)]">Los clientes se crean al registrar una venta con su nombre.</p>}</div> :
