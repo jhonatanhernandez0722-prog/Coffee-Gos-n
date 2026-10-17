@@ -10,7 +10,7 @@ from app.core.business_time import BUSINESS_TZ, business_day_bounds, business_to
 from app.core.permissions import require_section
 from app.core.transfers import TRANSFER, not_transfer
 from app.db.session import get_db
-from app.models import Credit, FinancialMovement, InventoryMovement, Liability, OpeningBalanceCorrection, Product, Sale, SaleItem, User
+from app.models import Credit, Customer, FinancialMovement, InventoryMovement, Liability, OpeningBalanceCorrection, Product, Sale, SaleItem, User
 from app.schemas.financial_reports import BalanceReport, CashReconciliation, DayMovement, MethodFlow, LiabilityCreate, LiabilityResponse, OpeningBalanceCorrectionCreate, OpeningBalanceCorrectionResponse, OpeningBalanceResponse
 
 router = APIRouter(prefix="/financial-reports", tags=["financial-reports"])
@@ -72,22 +72,32 @@ def day_flows(database: Session, start: datetime, end: datetime) -> dict[tuple[s
 
 
 def day_movements(database: Session, start: datetime, end: datetime) -> list[DayMovement]:
-    """Detalle de los otros ingresos, egresos y traslados del día, para saber de dónde sale cada valor del arqueo."""
-    movements = database.scalars(
-        select(FinancialMovement)
-        .where(*available_financial_filters(), FinancialMovement.sale_id.is_(None), MONEY_DATE >= start, MONEY_DATE < end)
+    """Detalle de los pagos de créditos, otros ingresos, egresos y traslados del día, para saber de dónde sale cada valor del arqueo."""
+    rows = database.execute(
+        select(FinancialMovement, Credit.id, Customer.name)
+        .outerjoin(Credit, Credit.sale_id == FinancialMovement.sale_id)
+        .outerjoin(Customer, Customer.id == Credit.customer_id)
+        .where(*available_financial_filters(), FinancialMovement.sale_id.is_(None) | Credit.id.is_not(None), MONEY_DATE >= start, MONEY_DATE < end)
         .order_by(MONEY_DATE, FinancialMovement.id)
     ).all()
+
+    def kind(movement: FinancialMovement, credit_id: int | None) -> str:
+        if credit_id is not None:
+            return "credit_payment"
+        if movement.income_type == TRANSFER:
+            return "transfer_in" if movement.movement_type == "INCOME" else "transfer_out"
+        return "expenses" if movement.movement_type == "EXPENSE" else "other_income"
+
     return [
         DayMovement(
             id=movement.id,
-            kind=("transfer_in" if movement.movement_type == "INCOME" else "transfer_out") if movement.income_type == TRANSFER else "expenses" if movement.movement_type == "EXPENSE" else "other_income",
+            kind=kind(movement, credit_id),
             payment_method=movement.payment_method or "",
             amount=movement.amount,
             concept=movement.observation or movement.concept,
-            person_name=movement.person_name,
+            person_name=customer_name or movement.person_name,
         )
-        for movement in movements
+        for movement, credit_id, customer_name in rows
     ]
 
 

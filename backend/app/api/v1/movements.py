@@ -82,6 +82,9 @@ def list_movements(
 
     inventory_sale_ids = {movement.sale_id for movement, _ in inventory_rows if movement.sale_id}
     sale_financials = {movement.sale_id: (movement, quantity) for movement, quantity in financial_rows if movement.sale_id}
+    # En una venta a crédito los movimientos financieros son pagos, no la venta: se listan aparte y la venta muestra lo fiado.
+    candidate_sale_ids = inventory_sale_ids | set(sale_financials)
+    credit_amounts = dict(database.execute(select(Credit.sale_id, Credit.original_amount).where(Credit.sale_id.in_(candidate_sale_ids))).all()) if candidate_sale_ids else {}
     purchase_financial_ids = {movement.financial_movement_id for movement, _ in inventory_rows if movement.financial_movement_id}
     linked_purchase_financials = database.scalars(select(FinancialMovement).where(FinancialMovement.id.in_(purchase_financial_ids))).all() if purchase_financial_ids else []
     financial_by_id = {movement.id: movement for movement, _ in financial_rows}
@@ -132,7 +135,7 @@ def list_movements(
                 related_id=movement.sale_id,
                 product_id=movement.product_id,
                 movement_type=movement.movement_type,
-                amount=(financial_by_id.get(movement.financial_movement_id).amount if movement.financial_movement_id and financial_by_id.get(movement.financial_movement_id) else sale_financials.get(movement.sale_id, (None, None))[0].amount if movement.sale_id and sale_financials.get(movement.sale_id) else None),
+                amount=(financial_by_id.get(movement.financial_movement_id).amount if movement.financial_movement_id and financial_by_id.get(movement.financial_movement_id) else credit_amounts[movement.sale_id] if movement.sale_id in credit_amounts else sale_financials.get(movement.sale_id, (None, None))[0].amount if movement.sale_id and sale_financials.get(movement.sale_id) else None),
                 unit_cost=(financial_by_id.get(movement.financial_movement_id).amount / movement.quantity if movement.financial_movement_id and financial_by_id.get(movement.financial_movement_id) and movement.quantity else None),
                 quantity=movement.quantity,
                 concept=movement.observation or movement.movement_type,
@@ -146,7 +149,7 @@ def list_movements(
         )
 
     for movement, quantity in financial_rows:
-        if movement.sale_id in inventory_sale_ids or movement.id in purchase_financial_ids:
+        if (movement.sale_id in inventory_sale_ids and movement.sale_id not in credit_amounts) or movement.id in purchase_financial_ids:
             continue
         sale_detail = sale_metadata.get(movement.sale_id, {})
         rows.append(
@@ -365,6 +368,9 @@ def delete_movement(
         movement = database.get(FinancialMovement, movement_id)
         if movement is None:
             raise HTTPException(status_code=404, detail="Movimiento financiero no encontrado")
+        if movement.sale_id and movement.movement_type == "INCOME" and database.scalar(select(Credit.id).where(Credit.sale_id == movement.sale_id)):
+            # Borrar un pago de crédito desde aquí eliminaría la venta completa con sus demás pagos.
+            raise HTTPException(status_code=409, detail="Los pagos de crédito no se eliminan desde Movimientos; elimina la venta o el crédito si es necesario")
         if movement.sale_id:
             sale = database.get(Sale, movement.sale_id)
             if sale is not None:
