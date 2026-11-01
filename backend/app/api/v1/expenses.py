@@ -116,8 +116,8 @@ def update_expense(
     ).one_or_none() or (None, None)
     if movement is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Egreso no encontrado")
-    if movement.settled_at is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No se puede editar un egreso ya liquidado")
+    # Un egreso ya registrado en el saldo también se puede corregir: los saldos y el arqueo se recalculan
+    # a partir de los movimientos, así que el cambio se refleja en la fecha original del egreso.
     category = database.get(ExpenseCategory, payload.category_id)
     if category is None or not category.is_active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La categoría no está disponible")
